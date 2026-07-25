@@ -122,6 +122,48 @@ const findAttachment = (
   return best;
 };
 
+const pointToSegmentDistance = (
+  px: number,
+  py: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+) => {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(
+    0,
+    Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)),
+  );
+  const projX = x1 + t * dx;
+  const projY = y1 + t * dy;
+  return Math.hypot(px - projX, py - projY);
+};
+
+const isDrawingTouched = (
+  drawing: CanvasElement,
+  x: number,
+  y: number,
+  eraserRadius: number,
+) => {
+  const points = drawing.points;
+  if (!points || points.length === 0) return false;
+  const threshold = eraserRadius + (drawing.strokeWidth || 3) / 2;
+  if (points.length === 1) {
+    return Math.hypot(x - points[0].x, y - points[0].y) <= threshold;
+  }
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    if (pointToSegmentDistance(x, y, p1.x, p1.y, p2.x, p2.y) <= threshold) {
+      return true;
+    }
+  }
+  return false;
+};
+
 function DetailedNotesContent() {
   const router = useRouter();
   const params = useSearchParams();
@@ -143,6 +185,7 @@ function DetailedNotesContent() {
     minH: number;
   } | null>(null);
   const drawRef = useRef<string | null>(null);
+  const eraseRef = useRef(false);
   const didDragRef = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyRef = useRef<
@@ -170,6 +213,8 @@ function DetailedNotesContent() {
   const [penMode, setPenMode] = useState(false);
   const [penColor, setPenColor] = useState("#7c3aed");
   const [penWidth, setPenWidth] = useState(3);
+  const [eraserMode, setEraserMode] = useState(false);
+  const [eraserWidth, setEraserWidth] = useState(20);
   const [backgroundColor, setBackgroundColor] = useState("#ffffff");
   const [historyState, setHistoryState] = useState({ index: -1, length: 0 });
 
@@ -455,10 +500,55 @@ function DetailedNotesContent() {
     setSelectedId(drawing.id);
   };
 
+  const performErase = useCallback(
+    (x: number, y: number) => {
+      updateElements((elements) => {
+        const hasDrawing = elements.some((el) => el.type === "drawing");
+        if (!hasDrawing) return elements;
+        const remaining = elements.filter((el) => {
+          if (el.type !== "drawing") return true;
+          return !isDrawingTouched(el, x, y, eraserWidth);
+        });
+        if (remaining.length !== elements.length) {
+          return remaining;
+        }
+        return elements;
+      }, false);
+    },
+    [eraserWidth],
+  );
+
+  const startErasing = (event: PointerEvent<HTMLDivElement>) => {
+    if (!eraserMode || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const point = {
+      x: clamp(event.clientX - rect.left, 0, CANVAS_WIDTH),
+      y: clamp(event.clientY - rect.top, 0, CANVAS_HEIGHT),
+    };
+    eraseRef.current = true;
+    didDragRef.current = false;
+    performErase(point.x, point.y);
+  };
+
+  const clearAllDrawings = () => {
+    updateElements((elements) =>
+      elements.filter((el) => el.type !== "drawing"),
+    );
+  };
+
   useEffect(() => {
     const move = (event: globalThis.PointerEvent) => {
       if (!canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
+      if (eraseRef.current && eraserMode) {
+        const point = {
+          x: clamp(event.clientX - rect.left, 0, CANVAS_WIDTH),
+          y: clamp(event.clientY - rect.top, 0, CANVAS_HEIGHT),
+        };
+        didDragRef.current = true;
+        performErase(point.x, point.y);
+        return;
+      }
       if (resizeRef.current) {
         const resize = resizeRef.current;
         const nextW = clamp(
@@ -587,7 +677,7 @@ function DetailedNotesContent() {
       );
     };
     const stop = () => {
-      if (didDragRef.current || drawRef.current)
+      if (didDragRef.current || drawRef.current || eraseRef.current)
         recordHistory(
           latestSnapshotRef.current.title,
           latestSnapshotRef.current.elements,
@@ -595,6 +685,7 @@ function DetailedNotesContent() {
       dragRef.current = null;
       drawRef.current = null;
       resizeRef.current = null;
+      eraseRef.current = false;
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", stop);
@@ -604,7 +695,7 @@ function DetailedNotesContent() {
     };
     // updateElements intentionally reads the current canvas state through its functional setter.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, queueSave]);
+  }, [title, queueSave, eraserMode, performErase]);
 
   const selected = useMemo(
     () => note?.elements.find((item) => item.id === selectedId),
@@ -792,8 +883,14 @@ function DetailedNotesContent() {
             <span>Curve</span>
           </button>
           <button
-            onClick={() => setPenMode((active) => !active)}
-            className={`canvas-tool ${penMode ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" : ""}`}
+            onClick={() => {
+              setPenMode((active) => {
+                const next = !active;
+                if (next) setEraserMode(false);
+                return next;
+              });
+            }}
+            className={`canvas-tool ${penMode ? "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700" : ""}`}
             title="Draw with pen"
           >
             <span className="text-base">✎</span>
@@ -818,6 +915,41 @@ function DetailedNotesContent() {
                 <option value={3}>Medium</option>
                 <option value={6}>Thick</option>
               </select>
+            </>
+          )}
+          <button
+            onClick={() => {
+              setEraserMode((active) => {
+                const next = !active;
+                if (next) setPenMode(false);
+                return next;
+              });
+            }}
+            className={`canvas-tool ${eraserMode ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700" : ""}`}
+            title="Erase pen drawings"
+          >
+            <span className="text-base">🧹</span>
+            <span>Eraser</span>
+          </button>
+          {eraserMode && (
+            <>
+              <select
+                value={eraserWidth}
+                onChange={(e) => setEraserWidth(Number(e.target.value))}
+                title="Eraser size"
+                className="h-8 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-rose-500"
+              >
+                <option value={10}>Small Eraser</option>
+                <option value={20}>Medium Eraser</option>
+                <option value={40}>Large Eraser</option>
+              </select>
+              <button
+                onClick={clearAllDrawings}
+                className="canvas-tool text-xs text-rose-600 hover:bg-rose-500/10 dark:text-rose-400"
+                title="Clear all pen drawings on canvas"
+              >
+                <span>Clear Drawings</span>
+              </button>
             </>
           )}
           <label className="canvas-tool" title="Canvas background colour">
@@ -978,10 +1110,11 @@ function DetailedNotesContent() {
             ref={canvasRef}
             onPointerDown={(event) => {
               if (penMode) startDrawing(event);
+              else if (eraserMode) startErasing(event);
               else if (event.target === event.currentTarget)
                 setSelectedId(null);
             }}
-            className={`relative mx-auto overflow-hidden rounded-[1.75rem] border border-slate-200 dark:border-slate-800 shadow-xl ${penMode ? "cursor-crosshair" : ""}`}
+            className={`relative mx-auto overflow-hidden rounded-[1.75rem] border border-slate-200 dark:border-slate-800 shadow-xl ${penMode ? "cursor-crosshair" : eraserMode ? "cursor-crosshair" : ""}`}
             style={{
               width: CANVAS_WIDTH,
               minHeight: CANVAS_HEIGHT,
@@ -1009,7 +1142,19 @@ function DetailedNotesContent() {
                     strokeWidth={el.strokeWidth || 3}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="pointer-events-none"
+                    className={
+                      eraserMode
+                        ? "pointer-events-auto cursor-pointer hover:stroke-rose-500/80 transition-colors"
+                        : "pointer-events-none"
+                    }
+                    onPointerDown={(e) => {
+                      if (eraserMode) {
+                        e.stopPropagation();
+                        updateElements((elements) =>
+                          elements.filter((item) => item.id !== el.id),
+                        );
+                      }
+                    }}
                   />
                 ))}
               {note.elements
