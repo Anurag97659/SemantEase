@@ -89,29 +89,36 @@ const anchorPoint = (
   if (anchor === "top") return { x: element.x + w / 2, y: element.y };
   return { x: element.x + w / 2, y: element.y + h };
 };
-const findAttachment = (elements: CanvasElement[], x: number, y: number) => {
-  let best: {
-    id: string;
-    anchor: "left" | "right" | "top" | "bottom";
-    point: Point;
-    distance: number;
-  } | null = null;
-  elements
-    .filter((item) => !["arrow", "drawing"].includes(item.type))
-    .forEach((item) => {
-      const anchors: Array<"left" | "right" | "top" | "bottom"> = [
-        "left",
-        "right",
-        "top",
-        "bottom",
-      ];
-      anchors.forEach((anchor) => {
-        const point = anchorPoint(item, anchor);
-        const distance = Math.hypot(x - point.x, y - point.y);
-        if (distance < 42 && (!best || distance < best.distance))
-          best = { id: item.id, anchor, point, distance };
-      });
-    });
+type Attachment = {
+  id: string;
+  anchor: "left" | "right" | "top" | "bottom";
+  point: Point;
+  distance: number;
+};
+
+const findAttachment = (
+  elements: CanvasElement[],
+  x: number,
+  y: number,
+): Attachment | null => {
+  let best: Attachment | null = null;
+  const targets = elements.filter(
+    (item) => !["arrow", "drawing"].includes(item.type),
+  );
+  for (const item of targets) {
+    const anchors: Array<"left" | "right" | "top" | "bottom"> = [
+      "left",
+      "right",
+      "top",
+      "bottom",
+    ];
+    for (const anchor of anchors) {
+      const point = anchorPoint(item, anchor);
+      const distance = Math.hypot(x - point.x, y - point.y);
+      if (distance < 42 && (!best || distance < best.distance))
+        best = { id: item.id, anchor, point, distance };
+    }
+  }
   return best;
 };
 
@@ -509,8 +516,9 @@ function DetailedNotesContent() {
           elements
             .map((el) => {
               if (el.id !== id) return el;
-              if (dragRef.current?.handle) {
-                if (dragRef.current.handle === "control")
+              const handle = dragRef.current?.handle;
+              if (handle) {
+                if (handle === "control")
                   return {
                     ...el,
                     controlX: nextX,
@@ -522,7 +530,7 @@ function DetailedNotesContent() {
                   nextX,
                   nextY,
                 );
-                if (dragRef.current.handle === "start")
+                if (handle === "start")
                   return {
                     ...el,
                     x: attached?.point.x || nextX,
