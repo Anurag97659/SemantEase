@@ -41,7 +41,14 @@ A premium, AI-powered vocabulary bank and dictionary companion built with Next.j
 *   **Google Forms-Style Review**: After submitting, users immediately view their overall score alongside color-coded feedback (green for correct answers, red for incorrect selections) showing correct choices.
 *   **Fully Ephemeral**: Tests are run in-memory and are not saved, allowing students to test themselves, reset, and instantly generate fresh tests.
 
-### 7. GitHub Dark & Light Themes
+### 7. Personalized Note-Taking
+*   **Interactive Visual Canvas**: Create, open, and manage rich personal note boards with dynamic canvas elements, including sticky notes, rich text blocks, customizable geometric & speech shapes, interactive tables, and freehand pen drawings.
+*   **Vocabulary Integration & Word Cards**: Pin dictionary words directly onto canvas note boards to keep word definitions, notes, and visual study context in one workspace.
+*   **Direct Word Notes**: Attach private, personal notes directly to individual word entries within your vocabulary bank.
+*   **My Notes Dashboard**: A centralized dashboard to search, filter, preview, create, and manage all your interactive note boards.
+*   **Auto-Saving & Dynamic Connectors**: Supports real-time backend persistence to MongoDB, curved arrow connectors between elements, custom styling controls (colors, typography, formatting), and undo/redo history.
+
+### 8. GitHub Dark & Light Themes
 *   **Dial-Gear Switcher**: Toggle themes instantly via a rotating dial gear inside the navbar.
 *   **GitHub Dark Mode styling**: Dark theme modeled precisely after GitHub's official `#0d1117` background theme with high-contrast slate text and `#161b22` container panels.
 

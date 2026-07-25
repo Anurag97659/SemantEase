@@ -76,3 +76,50 @@ body {
 .animate-wave-4 {
   animation: soundwave 0.8s ease-in-out infinite 0.45s;
 }
+
+.canvas-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.7rem;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.canvas-tool:hover {
+  background: color-mix(in srgb, #8b5cf6 12%, transparent);
+  color: #6d28d9;
+}
+
+.dark .canvas-tool { color: #cbd5e1; }
+.dark .canvas-tool:hover { color: #c4b5fd; }
+
+/* Word-style shape presets for freeform note boxes. */
+.notes-shape-cloud {
+  border-radius: 42% 58% 48% 52% / 42% 43% 57% 58%;
+  box-shadow: inset 0 0 0 2px rgb(124 58 237 / 0.55), 0 10px 22px rgb(15 23 42 / 0.14);
+}
+
+.notes-shape-speech {
+  clip-path: polygon(4% 0, 96% 0, 100% 8%, 100% 78%, 76% 78%, 66% 100%, 60% 78%, 4% 78%, 0 70%, 0 8%);
+  box-shadow: inset 0 0 0 2px rgb(124 58 237 / 0.7), 0 10px 22px rgb(15 23 42 / 0.14);
+}
+
+.notes-shape-diamond {
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  box-shadow: inset 0 0 0 2px rgb(124 58 237 / 0.7), 0 10px 22px rgb(15 23 42 / 0.14);
+}
+
+.notes-shape-hexagon {
+  clip-path: polygon(24% 0, 76% 0, 100% 50%, 76% 100%, 24% 100%, 0 50%);
+  box-shadow: inset 0 0 0 2px rgb(124 58 237 / 0.7), 0 10px 22px rgb(15 23 42 / 0.14);
+}
+
+.notes-shape-parallelogram {
+  clip-path: polygon(14% 0, 100% 0, 86% 100%, 0 100%);
+  box-shadow: inset 0 0 0 2px rgb(124 58 237 / 0.7), 0 10px 22px rgb(15 23 42 / 0.14);
+}
