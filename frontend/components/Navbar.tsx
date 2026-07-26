@@ -13,7 +13,6 @@ export default function Navbar() {
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    
     apiFetch("/WoahCab/users/getProfile")
       .then((res) => {
         if (res?.data?.username) {
@@ -21,10 +20,10 @@ export default function Navbar() {
         }
       })
       .catch(() => {
-        // throw new Error("Failed to fetch user profile");
+        // user not logged in or error
       });
 
-    // 2. Initialize theme from localStorage
+    // Initialize theme from localStorage
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme === "dark") {
       setTheme("dark");
@@ -113,7 +112,7 @@ export default function Navbar() {
               onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
               aria-expanded={isAccountMenuOpen}
               aria-controls="account-menu"
-              className="flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 transition-colors font-semibold text-sm cursor-pointer"
+              className="flex items-center gap-2 text-slate-700 dark:text-slate-350 hover:text-violet-600 dark:hover:text-violet-400 transition-colors font-semibold text-sm cursor-pointer"
             >
               <span className="max-w-24 truncate sm:max-w-none">{username ? `@${username}` : "User"}</span>
               <svg className={`w-4 h-4 transition-transform ${isAccountMenuOpen ? "rotate-180" : "md:group-hover:rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -128,10 +127,31 @@ export default function Navbar() {
                 isAccountMenuOpen ? "block" : "hidden md:group-hover:block"
               }`}
             >
-              
               {/* Conditional options depending on Auth */}
               {username ? (
                 <>
+                  <Link
+                    href="/test"
+                    onClick={() => setIsAccountMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-all"
+                  >
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    Test
+                  </Link>
+
+                  <Link
+                    href="/mynotes-dashboard"
+                    onClick={() => setIsAccountMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-all"
+                  >
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 20h9M12 4h9M4 9h16M4 15h16" />
+                    </svg>
+                    My Notes
+                  </Link>
+
                   <Link
                     href="/settings"
                     onClick={() => setIsAccountMenuOpen(false)}
@@ -144,24 +164,14 @@ export default function Navbar() {
                   </Link>
 
                   <Link
-                    href="/test"
+                    href="/suggestions"
                     onClick={() => setIsAccountMenuOpen(false)}
                     className="flex items-center gap-2.5 px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-all"
                   >
                     <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                     </svg>
-                    Test
-                  </Link>
-                  <Link
-                    href="/mynotes-dashboard"
-                    onClick={() => setIsAccountMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-all"
-                  >
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 20h9M12 4h9M4 9h16M4 15h16" />
-                    </svg>
-                    My Notes
+                    Suggestions
                   </Link>
 
                   <button
@@ -256,7 +266,6 @@ export default function Navbar() {
                   </span>
                 </button>
               </div>
-
             </div>
           </div>
         </div>
