@@ -4,6 +4,8 @@ import cookieParser from 'cookie-parser';
 import userRoutes from './routes/user.routes.js';
 import wordRoutes from './routes/word.routes.js';
 import personalNoteRoutes from './routes/personalNote.routes.js';
+import suggestionRoutes from './routes/suggestion.routes.js';
+
 const app = express();
 
 // const allowedOrigins = ['http://localhost:3000'];
@@ -36,6 +38,7 @@ app.use(cookieParser());
 app.use('/WoahCab/users',userRoutes);
 app.use('/WoahCab/words',wordRoutes);
 app.use('/WoahCab/notes', personalNoteRoutes);
+app.use('/WoahCab/suggestions', suggestionRoutes);
 
 
 app.use((err, req, res, next) => {

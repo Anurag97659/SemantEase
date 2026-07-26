@@ -39,7 +39,7 @@ A premium, AI-powered vocabulary bank and dictionary companion built with Next.j
 *   **Competitive Exam Style**: Targets advanced grammar and vocab levels matching AFCAT, CDS, and other competitive exams.
 *   **Independent Distractors**: Question stems are based on database words, but option choices (A, B, C, D) are created dynamically by AI to remain independent and challenging.
 *   **Google Forms-Style Review**: After submitting, users immediately view their overall score alongside color-coded feedback (green for correct answers, red for incorrect selections) showing correct choices.
-*   **Fully Ephemeral**: Tests are run in-memory and are not saved, allowing students to test themselves, reset, and instantly generate fresh tests.
+*   **Fully Ephemeral**: Tests are run in-memory and are not saved, allowing students to test themeselves, reset, and instantly generate fresh tests.
 
 ### 7. Personalized Note-Taking
 *   **Interactive Visual Canvas**: Create, open, and manage rich personal note boards with dynamic canvas elements, including sticky notes, rich text blocks, customizable geometric & speech shapes, interactive tables, and freehand pen drawings.
@@ -48,7 +48,12 @@ A premium, AI-powered vocabulary bank and dictionary companion built with Next.j
 *   **My Notes Dashboard**: A centralized dashboard to search, filter, preview, create, and manage all your interactive note boards.
 *   **Auto-Saving & Dynamic Connectors**: Supports real-time backend persistence to MongoDB, curved arrow connectors between elements, custom styling controls (colors, typography, formatting), and undo/redo history.
 
-### 8. GitHub Dark & Light Themes
+### 8. Private Suggestion Box & Admin Dashboard
+*   **User Suggestion Submission**: Logged-in users can send private suggestions, feature requests, and bug reports directly to the administrator. Suggestions are kept private and hidden from public view.
+*   **Admin Suggestion Inbox (`avasanam`)**: Accessing `/suggestions` as the admin user (`avasanam`) unlocks an exclusive management dashboard to review suggestions, filter by status or category, update progress badges (Pending, Reviewed, Resolved), and remove items.
+*   **GitHub Open-Source Collaboration**: Embedded collaboration section linking directly to the [WoahCab GitHub Repository](https://github.com/Anurag97659/WoahCab), issue tracker, and step-by-step contribution guidelines.
+
+### 9. GitHub Dark & Light Themes
 *   **Dial-Gear Switcher**: Toggle themes instantly via a rotating dial gear inside the navbar.
 *   **GitHub Dark Mode styling**: Dark theme modeled precisely after GitHub's official `#0d1117` background theme with high-contrast slate text and `#161b22` container panels.
 
