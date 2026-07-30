@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LexIconic",
+  title: "SemantEase",
   description: "A dictionary of words and phrases from the English language, with definitions, synonyms, antonyms, and example sentences.",
   verification: {
     google: "o-wLWugc1Io9rkmdkoJWkWGlhND8V2CeqP-O2Pypf9A",

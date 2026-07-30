@@ -41,11 +41,11 @@ export default function LoginPage() {
           <div className="text-center mb-8 flex flex-col items-center">
             <img
               src="/logo.jpg"
-              alt="LexIconic Logo"
+              alt="SemantEase Logo"
               className="w-16 h-16 rounded-2xl shadow-xl border border-violet-500/20 mb-4 hover:rotate-3 transition-transform duration-300 object-cover"
             />
             <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-violet-600 via-indigo-500 to-indigo-650 dark:from-violet-400 dark:via-indigo-200 dark:to-indigo-400 bg-clip-text text-transparent">
-              LexIconic
+              SemantEase
             </h1>
             <p className="text-slate-605 dark:text-slate-400 mt-2 text-sm font-medium">
               Expand your vocabulary, one word at a time.

@@ -798,7 +798,7 @@ export default function SuggestionsPage() {
                             d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
                           />
                         </svg>
-                        Anurag97659/WoahCab Repo
+                        Anurag97659/SemantEase Repo
                       </span>
                       <svg
                         className="w-4 h-4 group-hover:translate-x-1 transition-transform"

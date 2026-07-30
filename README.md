@@ -1,6 +1,6 @@
-# LexIconic
+# SemantEase
 
-A premium, AI-powered vocabulary bank and dictionary companion built with Next.js, Node.js, and MongoDB. LexIconic automates word definition parsing using the Google Gemini AI developer platform and provides smart conceptual search matching.
+A premium, AI-powered vocabulary bank and dictionary companion built with Next.js, Node.js, and MongoDB. SemantEase automates word definition parsing using the Google Gemini AI developer platform and provides smart conceptual search matching.
 
 ---
 
@@ -77,7 +77,7 @@ Create a `.env` file in the `backend/` directory:
 ```env
 PORT=8000
 MONGODB_URI=your_mongodb_connection_string
-DB_NAME=LexIconic
+DB_NAME=SemantEase
 ACCESS_TOKEN_SECRET=your_jwt_access_secret
 REFRESH_TOKEN_SECRET=your_jwt_refresh_secret
 ACCESS_TOKEN_EXPIRY=1d
