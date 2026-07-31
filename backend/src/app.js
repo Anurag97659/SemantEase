@@ -41,14 +41,6 @@ app.use('/WoahCab/notes', personalNoteRoutes);
 app.use('/WoahCab/suggestions', suggestionRoutes);
 
 
-// remove this when domain gets expire
-app.use((req, res, next) => {
-  if (req.hostname === "lexiconic.onrender.com") {
-    return res.redirect(301, "https://semantease.app" + req.originalUrl);
-  }
-  next();
-});
-
 app.use((err, req, res, next) => {
   console.error(err);
   const statusCode = err.statusCode || 500;
