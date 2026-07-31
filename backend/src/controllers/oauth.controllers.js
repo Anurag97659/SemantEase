@@ -2,8 +2,11 @@ import { OAuth2Client } from "google-auth-library";
 import { ConfidentialClientApplication } from "@azure/msal-node";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+
 
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
@@ -29,7 +32,36 @@ const generateAccessTokenAndRefreshToken = async (userId) => {
 
 const cookieOptions = { httpOnly: true, secure: true, sameSite: "none" };
 
+function createHandoffToken(userId) {
+  return jwt.sign(
+    { userId: userId.toString(), handoff: true },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: "2m" }
+  );
+}
 
+
+export const verifyHandoff = asyncHandler(async (req, res) => {
+  const { token } = req.body;
+  if (!token) throw new ApiError(400, "Handoff token required");
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+  } catch {
+    throw new ApiError(401, "Invalid or expired handoff token");
+  }
+
+  if (!decoded.handoff) throw new ApiError(401, "Invalid token type");
+
+  const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(decoded.userId);
+
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .json(new ApiResponse(200, {}, "OAuth session established"));
+});
 
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -85,18 +117,11 @@ export const googleCallback = async (req, res) => {
         email: email || undefined,
         provider: "google",
         providerId,
-        password: undefined,
-        securityQuestion: undefined,
-        securityAnswer: undefined,
       });
     }
 
-    const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id);
-
-    return res
-      .cookie("accessToken", accessToken, cookieOptions)
-      .cookie("refreshToken", refreshToken, cookieOptions)
-      .redirect(`${FRONTEND_URL}/words`);
+    const handoffToken = createHandoffToken(user._id);
+    return res.redirect(`${FRONTEND_URL}/oauth-callback?token=${handoffToken}`);
   } catch (err) {
     console.error("Google OAuth error:", err);
     return res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);
@@ -119,6 +144,7 @@ function getMsalApp() {
   return msalApp;
 }
 
+
 export const microsoftRedirect = async (req, res) => {
   try {
     const app = getMsalApp();
@@ -133,7 +159,6 @@ export const microsoftRedirect = async (req, res) => {
     res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);
   }
 };
-
 
 export const microsoftCallback = async (req, res) => {
   const { code, error } = req.query;
@@ -173,18 +198,11 @@ export const microsoftCallback = async (req, res) => {
         email: userEmail || undefined,
         provider: "microsoft",
         providerId,
-        password: undefined,
-        securityQuestion: undefined,
-        securityAnswer: undefined,
       });
     }
 
-    const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id);
-
-    return res
-      .cookie("accessToken", accessToken, cookieOptions)
-      .cookie("refreshToken", refreshToken, cookieOptions)
-      .redirect(`${FRONTEND_URL}/words`);
+    const handoffToken = createHandoffToken(user._id);
+    return res.redirect(`${FRONTEND_URL}/oauth-callback?token=${handoffToken}`);
   } catch (err) {
     console.error("Microsoft OAuth error:", err);
     return res.redirect(`${FRONTEND_URL}/login?error=oauth_failed`);
