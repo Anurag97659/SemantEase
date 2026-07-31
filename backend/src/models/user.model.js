@@ -20,9 +20,23 @@ const userSchema = new Schema(
       index: true,
       trim: true,
     },
+    email: {
+      type: String,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+    },
+    provider: {
+      type: String,
+      enum: ["local", "google", "microsoft"],
+      default: "local",
+    },
+    providerId: {
+      type: String,
+      sparse: true,
+    },
     password: {
       type: String,
-      required: true,
       minlength: 8,
     },
     refreshToken: {
@@ -30,12 +44,10 @@ const userSchema = new Schema(
     },
     securityQuestion: {
       type: String,
-      required: true,
       trim: true,
     },
     securityAnswer: {
       type: String,
-      required: true,
       trim: true,
     },
     backupCodes: {
@@ -47,10 +59,11 @@ const userSchema = new Schema(
 );
 
 userSchema.pre("save", async function () {
-  if (this.isModified("password")) {
+ 
+  if (this.isModified("password") && this.password) {
     this.password = await bcrypt.hash(this.password, 10);
   }
-  if (this.isModified("securityAnswer")) {
+  if (this.isModified("securityAnswer") && this.securityAnswer) {
     this.securityAnswer = await bcrypt.hash(this.securityAnswer.trim().toLowerCase(), 10);
   }
 });
