@@ -570,7 +570,7 @@ export default function SuggestionsPage() {
                   Share Your Suggestions & Feedback
                 </h1>
                 <p className="text-sm sm:text-base text-violet-100 mt-2 font-normal">
-                  Have ideas to make LexIconic better? Your feedback goes
+                  Have ideas to make SemantEase better? Your feedback goes
                   directly to our admin team and helps shape future updates.
                 </p>
                 {isAdmin && (
@@ -771,7 +771,7 @@ export default function SuggestionsPage() {
                   </div>
 
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6">
-                    LexIconic (WoahCab) is open to collaboration! If you are a
+                    SemantEase (WoahCab) is open to collaboration! If you are a
                     developer, designer, or language enthusiast, explore our
                     repository, submit pull requests, or file technical issues
                     on GitHub.
