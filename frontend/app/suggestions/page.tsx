@@ -771,7 +771,7 @@ export default function SuggestionsPage() {
                   </div>
 
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mb-6">
-                    LexIconic (WoahCab) is open to collaboration! If you are a
+                    SemantEase is open to collaboration! If you are a
                     developer, designer, or language enthusiast, explore our
                     repository, submit pull requests, or file technical issues
                     on GitHub.
@@ -779,7 +779,7 @@ export default function SuggestionsPage() {
 
                   <div className="space-y-3">
                     <a
-                      href="https://github.com/Anurag97659/WoahCab"
+                      href="https://github.com/Anurag97659/SemantEase"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs flex items-center justify-between border border-white/10 transition-all group"
@@ -816,7 +816,7 @@ export default function SuggestionsPage() {
                     </a>
 
                     <a
-                      href="https://github.com/Anurag97659/WoahCab/issues"
+                      href="https://github.com/Anurag97659/SemantEase/issues"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white font-medium text-xs flex items-center justify-between border border-white/5 transition-all group"
