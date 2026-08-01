@@ -48,6 +48,7 @@ function BlendDetailsContent() {
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [starringWordId, setStarringWordId] = useState<string | null>(null);
+  const [deletingBlend, setDeletingBlend] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -123,6 +124,22 @@ function BlendDetailsContent() {
     }
   };
 
+  const handleDeleteBlend = async () => {
+    if (!blendId) return;
+    if (!window.confirm("Delete this blend for all members?")) {
+      return;
+    }
+    setDeletingBlend(true);
+    setError("");
+    try {
+      await apiFetch(`/WoahCab/social/blend/${blendId}`, { method: "DELETE" });
+      router.push("/friends");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not delete blend");
+      setDeletingBlend(false);
+    }
+  };
+
   const filteredWords = useMemo(() => {
     return [...words]
       .filter((word) => {
@@ -171,9 +188,19 @@ function BlendDetailsContent() {
       <Navbar />
       <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8">
         <div className="mb-5">
-          <Link href="/friends" className="text-sm font-semibold text-violet-600 hover:underline">
-            ← Back to Friends
-          </Link>
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/friends" className="text-sm font-semibold text-violet-600 hover:underline">
+              ← Back to Friends
+            </Link>
+            <button
+              type="button"
+              onClick={handleDeleteBlend}
+              disabled={deletingBlend}
+              className="rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold px-3 py-2 disabled:opacity-60 cursor-pointer"
+            >
+              {deletingBlend ? "Deleting…" : "Delete Blend"}
+            </button>
+          </div>
         </div>
 
         <section className="rounded-[2rem] border border-violet-500/15 bg-gradient-to-br from-violet-600/12 via-indigo-500/8 to-transparent p-7 md:p-10 mb-8">

@@ -8,6 +8,7 @@ import {
   rejectFriendRequest,
   createBlend,
   getBlendById,
+  deleteBlend,
   getBlendWords,
   searchBlendWords,
 } from "../controllers/social.controllers.js";
@@ -20,7 +21,7 @@ router.route("/friend-request").post(verifyJWT, sendFriendRequest);
 router.route("/friend-request/:requesterId/accept").post(verifyJWT, acceptFriendRequest);
 router.route("/friend-request/:requesterId/reject").post(verifyJWT, rejectFriendRequest);
 router.route("/blends").post(verifyJWT, createBlend);
-router.route("/blend/:blendId").get(verifyJWT, getBlendById);
+router.route("/blend/:blendId").get(verifyJWT, getBlendById).delete(verifyJWT, deleteBlend);
 router.route("/blend/:blendId/words").get(verifyJWT, getBlendWords);
 router.route("/blend/:blendId/search").get(verifyJWT, searchBlendWords);
 

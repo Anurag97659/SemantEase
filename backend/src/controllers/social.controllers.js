@@ -377,6 +377,30 @@ const getBlendById = asyncHandler(async (req, res) => {
   );
 });
 
+const deleteBlend = asyncHandler(async (req, res) => {
+  const { blendId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(blendId)) {
+    throw new ApiError(400, "Invalid blend ID");
+  }
+
+  const blend = await Blend.findById(blendId);
+  if (!blend) {
+    throw new ApiError(404, "Blend not found");
+  }
+
+  const isMember = (blend.members || []).some(
+    (memberId) => memberId.toString() === req.user._id.toString()
+  );
+  if (!isMember) {
+    throw new ApiError(403, "You are not a member of this blend");
+  }
+
+  await Blend.findByIdAndDelete(blendId);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Blend deleted successfully"));
+});
+
 const getBlendWords = asyncHandler(async (req, res) => {
   const { blendId } = req.params;
   if (!mongoose.Types.ObjectId.isValid(blendId)) {
@@ -517,6 +541,7 @@ export {
   rejectFriendRequest,
   createBlend,
   getBlendById,
+  deleteBlend,
   getBlendWords,
   searchBlendWords,
 };

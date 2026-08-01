@@ -43,6 +43,7 @@ export default function FriendsPage() {
   const [showBlendModal, setShowBlendModal] = useState(false);
   const [selectedBlendFriendIds, setSelectedBlendFriendIds] = useState<string[]>([]);
   const [creatingBlend, setCreatingBlend] = useState(false);
+  const [deletingBlendId, setDeletingBlendId] = useState<string | null>(null);
 
   const applyOverview = (overview: {
     friends?: UserCard[];
@@ -169,6 +170,22 @@ export default function FriendsPage() {
       setError(err instanceof Error ? err.message : "Could not create blend");
     } finally {
       setCreatingBlend(false);
+    }
+  };
+
+  const deleteBlend = async (blendId: string) => {
+    if (!window.confirm("Are you sure you want to delete this blend for all members?")) {
+      return;
+    }
+    setDeletingBlendId(blendId);
+    setError("");
+    try {
+      await apiFetch(`/WoahCab/social/blend/${blendId}`, { method: "DELETE" });
+      await loadOverview();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not delete blend");
+    } finally {
+      setDeletingBlendId(null);
     }
   };
 
@@ -394,16 +411,27 @@ export default function FriendsPage() {
             {blends.length ? (
               <div className="space-y-3">
                 {blends.map((blend) => (
-                  <Link
+                  <div
                     key={blend._id}
-                    href={`/friends/blends?id=${blend._id}`}
-                    className="block rounded-xl border border-border bg-background hover:border-violet-500/30 px-4 py-3"
+                    className="rounded-xl border border-border bg-background hover:border-violet-500/30 px-4 py-3"
                   >
-                    <p className="font-semibold">{blend.title}</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      {blend.members.length} members
-                    </p>
-                  </Link>
+                    <div className="flex items-start justify-between gap-3">
+                      <Link href={`/friends/blends?id=${blend._id}`} className="flex-1">
+                        <p className="font-semibold">{blend.title}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {blend.members.length} members
+                        </p>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => deleteBlend(blend._id)}
+                        disabled={deletingBlendId === blend._id}
+                        className="rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold px-2.5 py-1.5 disabled:opacity-60 cursor-pointer"
+                      >
+                        {deletingBlendId === blend._id ? "Deleting…" : "Delete"}
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (
