@@ -6,6 +6,7 @@ import {
   sendFriendRequest,
   acceptFriendRequest,
   rejectFriendRequest,
+  removeFriend,
   createBlend,
   getBlendById,
   deleteBlend,
@@ -20,6 +21,7 @@ router.route("/search-users").get(verifyJWT, searchUsers);
 router.route("/friend-request").post(verifyJWT, sendFriendRequest);
 router.route("/friend-request/:requesterId/accept").post(verifyJWT, acceptFriendRequest);
 router.route("/friend-request/:requesterId/reject").post(verifyJWT, rejectFriendRequest);
+router.route("/friend/:friendId").delete(verifyJWT, removeFriend);
 router.route("/blends").post(verifyJWT, createBlend);
 router.route("/blend/:blendId").get(verifyJWT, getBlendById).delete(verifyJWT, deleteBlend);
 router.route("/blend/:blendId/words").get(verifyJWT, getBlendWords);

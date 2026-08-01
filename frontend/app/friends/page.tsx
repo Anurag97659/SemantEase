@@ -44,6 +44,7 @@ export default function FriendsPage() {
   const [selectedBlendFriendIds, setSelectedBlendFriendIds] = useState<string[]>([]);
   const [creatingBlend, setCreatingBlend] = useState(false);
   const [deletingBlendId, setDeletingBlendId] = useState<string | null>(null);
+  const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
 
   const applyOverview = (overview: {
     friends?: UserCard[];
@@ -186,6 +187,22 @@ export default function FriendsPage() {
       setError(err instanceof Error ? err.message : "Could not delete blend");
     } finally {
       setDeletingBlendId(null);
+    }
+  };
+
+  const removeFriend = async (friendId: string) => {
+    if (!window.confirm("Are you sure you want to remove this friend?")) {
+      return;
+    }
+    setRemovingFriendId(friendId);
+    setError("");
+    try {
+      await apiFetch(`/WoahCab/social/friend/${friendId}`, { method: "DELETE" });
+      await loadOverview();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not remove friend");
+    } finally {
+      setRemovingFriendId(null);
     }
   };
 
@@ -342,9 +359,40 @@ export default function FriendsPage() {
             {friends.length ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {friends.map((friend) => (
-                  <div key={friend._id} className="rounded-xl border border-border bg-background px-4 py-3">
-                    <p className="font-semibold">@{friend.username}</p>
-                    <p className="text-xs text-slate-500">{friend.fullname}</p>
+                  <div
+                    key={friend._id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3"
+                  >
+                    <div>
+                      <p className="font-semibold">@{friend.username}</p>
+                      <p className="text-xs text-slate-500">{friend.fullname}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFriend(friend._id)}
+                      disabled={removingFriendId === friend._id}
+                      title="Remove friend"
+                      aria-label={`Remove ${friend.username} from friends`}
+                      className="rounded-lg p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      {removingFriendId === friend._id ? (
+                        <span className="text-xs font-bold text-slate-400">…</span>
+                      ) : (
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 ))}
               </div>

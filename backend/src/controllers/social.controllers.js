@@ -533,12 +533,45 @@ Return only a JSON array of IDs like ["id1","id2"].`;
   }
 });
 
+const removeFriend = asyncHandler(async (req, res) => {
+  const { friendId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(friendId)) {
+    throw new ApiError(400, "Invalid friend ID");
+  }
+
+  const [currentUser, friendUser] = await Promise.all([
+    User.findById(req.user._id),
+    User.findById(friendId),
+  ]);
+
+  if (!currentUser || !friendUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const currentUserId = currentUser._id.toString();
+  const targetFriendId = friendUser._id.toString();
+
+  currentUser.friends = (currentUser.friends || []).filter(
+    (id) => id.toString() !== targetFriendId
+  );
+  friendUser.friends = (friendUser.friends || []).filter(
+    (id) => id.toString() !== currentUserId
+  );
+
+  await Promise.all([currentUser.save(), friendUser.save()]);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Friend removed successfully"));
+});
+
 export {
   getSocialOverview,
   searchUsers,
   sendFriendRequest,
   acceptFriendRequest,
   rejectFriendRequest,
+  removeFriend,
   createBlend,
   getBlendById,
   deleteBlend,
