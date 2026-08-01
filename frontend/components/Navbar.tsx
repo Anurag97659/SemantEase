@@ -8,7 +8,12 @@ import { apiFetch } from "../utils/api";
 export default function Navbar() {
   const router = useRouter();
   const [username, setUsername] = useState("");
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window === "undefined") {
+      return "light";
+    }
+    return localStorage.getItem("theme") === "dark" ? "dark" : "light";
+  });
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
@@ -22,17 +27,15 @@ export default function Navbar() {
       .catch(() => {
         // user not logged in or error
       });
+  }, []);
 
-    // Initialize theme from localStorage
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark") {
-      setTheme("dark");
+  useEffect(() => {
+    if (theme === "dark") {
       document.documentElement.classList.add("dark");
     } else {
-      setTheme("light");
       document.documentElement.classList.remove("dark");
     }
-  }, []);
+  }, [theme]);
 
   useEffect(() => {
     const closeMenuOnOutsideClick = (event: PointerEvent) => {
@@ -73,7 +76,7 @@ export default function Navbar() {
       await apiFetch("/WoahCab/users/logout", { method: "POST" });
       setUsername("");
       router.push("/login");
-    } catch (err) {
+    } catch {
       router.push("/login");
     }
   };
@@ -150,6 +153,17 @@ export default function Navbar() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 20h9M12 4h9M4 9h16M4 15h16" />
                     </svg>
                     My Notes
+                  </Link>
+
+                  <Link
+                    href="/friends"
+                    onClick={() => setIsAccountMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-all"
+                  >
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a4 4 0 00-5-3.87M17 20H7m10 0v-2c0-.654-.126-1.279-.356-1.851M7 20H2v-2a4 4 0 015-3.87M7 20v-2c0-.654.126-1.279.356-1.851m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 2a2 2 0 11-4 0 2 2 0 014 0zM7 9a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Friends
                   </Link>
 
                   <Link
