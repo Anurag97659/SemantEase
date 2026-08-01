@@ -35,7 +35,8 @@ export default function WordListPage() {
   const [words, setWords] = useState<WordItem[]>([]);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "mine" | "important">("all");
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "username">("newest");
+  const [usernameFilter, setUsernameFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
   const [starringWordId, setStarringWordId] = useState<string | null>(null);
@@ -117,7 +118,6 @@ export default function WordListPage() {
     }
   };
 
-  // 3. Apply local ownership and personal-important filters on words
   const filteredWords = words.filter((item) => {
     if (filterType === "mine") {
       if (!currentUser || !item.createdBy || item.createdBy._id !== currentUser._id) {
@@ -127,9 +127,15 @@ export default function WordListPage() {
     if (filterType === "important" && !item.isStarred) {
       return false;
     }
+    if (sortOrder === "username" && usernameFilter.trim()) {
+      if (!item.createdBy || !item.createdBy.username.toLowerCase().includes(usernameFilter.trim().toLowerCase())) {
+        return false;
+      }
+    }
     return true;
   })
   .sort((firstWord, secondWord) => {
+      if (sortOrder === "username") return 0; // preserve API order when filtering by username
       const timeDifference = new Date(firstWord.createdAt || 0).getTime() - new Date(secondWord.createdAt || 0).getTime();
       return sortOrder === "newest" ? -timeDifference : timeDifference;
     });
@@ -199,20 +205,58 @@ const formatUploadDate = (date?: string) => {
               </button>
             </div>
 
-            <div className="relative shrink-0">
-              <label htmlFor="word-sort" className="sr-only">Sort words</label>
-              <select
-                id="word-sort"
-                value={sortOrder}
-                onChange={(event) => setSortOrder(event.target.value as "newest" | "oldest")}
-                className="appearance-none w-full bg-card border border-border rounded-2xl py-3 pl-4 pr-10 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 cursor-pointer"
-              >
-                <option value="newest">Newest to Oldest</option>
-                <option value="oldest">Oldest to Newest</option>
-              </select>
-              <svg className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m7 10 5 5 5-5" />
-              </svg>
+            <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+              <div className="relative">
+                <label htmlFor="word-sort" className="sr-only">Sort words</label>
+                <select
+                  id="word-sort"
+                  value={sortOrder}
+                  onChange={(event) => {
+                    setSortOrder(event.target.value as "newest" | "oldest" | "username");
+                    if (event.target.value !== "username") setUsernameFilter("");
+                  }}
+                  className="appearance-none w-full bg-card border border-border rounded-2xl py-3 pl-4 pr-10 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 cursor-pointer"
+                >
+                  <option value="newest">Newest to Oldest</option>
+                  <option value="oldest">Oldest to Newest</option>
+                  <option value="username">By Username</option>
+                </select>
+                <svg className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m7 10 5 5 5-5" />
+                </svg>
+              </div>
+
+              {/* Username filter input — visible only when "By Username" is selected */}
+              {sortOrder === "username" && (
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </span>
+                  <input
+                    id="username-filter"
+                    type="text"
+                    autoFocus
+                    placeholder="Enter username…"
+                    value={usernameFilter}
+                    onChange={(e) => setUsernameFilter(e.target.value)}
+                    className="w-44 pl-9 pr-4 py-3 bg-card border border-violet-500 ring-1 ring-violet-500/30 rounded-2xl text-slate-900 dark:text-slate-100 placeholder-slate-450 dark:placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all text-xs font-bold"
+                  />
+                  {usernameFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setUsernameFilter("")}
+                      aria-label="Clear username filter"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Search Input (with loading indicator) */}
@@ -356,6 +400,8 @@ const formatUploadDate = (date?: string) => {
             <p className="text-slate-550 dark:text-slate-450 text-sm mb-8 font-semibold">
               {search 
                 ? "No matching vocabulary found. Try another description!" 
+                : sortOrder === "username" && usernameFilter.trim()
+                  ? `No words found for username "${usernameFilter.trim()}". Try a different username.`
                 : filterType === "mine"
                   ? "You haven't generated any words yet. Switch back to 'All Words' or submit a new word!"
                   : filterType === "important"
