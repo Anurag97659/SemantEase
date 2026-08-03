@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  sendRegistrationOtp,
   registeruser,
   loginuser,
   logoutuser,
@@ -9,6 +10,7 @@ import {
   deleteUser,
   getUsername,
   getProfile,
+  sendPasswordResetOtp,
   resetPassword,
   getSecurityQuestion
 } from "../controllers/user.controllers.js";
@@ -16,9 +18,12 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 
 const router = Router();
+router.route("/send-registration-otp").post(sendRegistrationOtp);
 router.route("/register").post(registeruser);
 router.route("/login").post(loginuser);
+router.route("/send-password-reset-otp").post(sendPasswordResetOtp);
 router.route("/reset-password").post(resetPassword);
+
 router.route("/question/:username").get(getSecurityQuestion);
 router.route("/logout").post(verifyJWT, logoutuser);
 router.route("/refreshToken").get(refreshAccessToken);

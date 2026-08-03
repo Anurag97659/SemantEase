@@ -26,6 +26,10 @@ const userSchema = new Schema(
       lowercase: true,
       trim: true,
     },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
     provider: {
       type: String,
       enum: ["local", "google", "microsoft"],

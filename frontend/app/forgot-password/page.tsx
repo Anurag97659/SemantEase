@@ -5,20 +5,59 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "../../utils/api";
 
-type RecoveryType = "question" | "backup_code";
+type RecoveryType = "email_otp" | "question" | "backup_code";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
-  const [type, setType] = useState<RecoveryType>("question");
+  const [type, setType] = useState<RecoveryType>("email_otp");
+  
+ 
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [maskedEmail, setMaskedEmail] = useState("");
+
   const [securityQuestion, setSecurityQuestion] = useState("");
   const [securityAnswer, setSecurityAnswer] = useState("");
-  const [backupCode, setBackupCode] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [fetchingQuestion, setFetchingQuestion] = useState(false);
+
+
+  const [backupCode, setBackupCode] = useState("");
+
+
+  const [newPassword, setNewPassword] = useState("");
+  
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const handleSendEmailOtp = async () => {
+    if (!username.trim()) {
+      setError("Please enter your username first");
+      return;
+    }
+    setSendingOtp(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await apiFetch("/WoahCab/users/send-password-reset-otp", {
+        method: "POST",
+        body: JSON.stringify({ username: username.trim() }),
+      });
+
+      if (response?.data?.maskedEmail) {
+        setMaskedEmail(response.data.maskedEmail);
+      }
+      setOtpSent(true);
+      setSuccess(response?.message || "OTP code sent to your registered email.");
+    } catch (err: any) {
+      setError(err.message || "Failed to send OTP code");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
 
   const handleFetchQuestion = async () => {
     if (!username.trim()) {
@@ -53,10 +92,11 @@ export default function ForgotPasswordPage() {
       await apiFetch("/WoahCab/users/reset-password", {
         method: "POST",
         body: JSON.stringify({
-          username,
+          username: username.trim(),
           type,
-          securityAnswer: type === "question" ? securityAnswer : undefined,
-          backupCode: type === "backup_code" ? backupCode : undefined,
+          otp: type === "email_otp" ? otp.trim() : undefined,
+          securityAnswer: type === "question" ? securityAnswer.trim() : undefined,
+          backupCode: type === "backup_code" ? backupCode.trim() : undefined,
           newPassword,
         }),
       });
@@ -84,7 +124,7 @@ export default function ForgotPasswordPage() {
               Reset Password
             </h1>
             <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm font-medium">
-              Recover access using security questions or backup codes.
+              Recover access using Email OTP, Security Questions, or Backup Code.
             </p>
           </div>
 
@@ -114,6 +154,16 @@ export default function ForgotPasswordPage() {
                   placeholder="e.g. anurag"
                   className="flex-1 px-4 py-3 bg-background border border-border rounded-2xl text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all text-sm font-medium"
                 />
+                {type === "email_otp" && (
+                  <button
+                    type="button"
+                    onClick={handleSendEmailOtp}
+                    disabled={sendingOtp || !username.trim()}
+                    className="px-4 bg-background hover:bg-card-hover text-violet-600 dark:text-violet-400 text-xs font-bold rounded-2xl border border-border transition-all active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1"
+                  >
+                    {sendingOtp ? "Sending..." : otpSent ? "Resend OTP" : "Send OTP"}
+                  </button>
+                )}
                 {type === "question" && (
                   <button
                     type="button"
@@ -131,20 +181,34 @@ export default function ForgotPasswordPage() {
               <label className="block text-xs font-bold text-slate-800 dark:text-slate-300 uppercase tracking-wider mb-2">
                 Recovery Method
               </label>
-              <div className="grid grid-cols-2 gap-2 p-1 bg-background border border-border rounded-2xl">
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-background border border-border rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setType("email_otp");
+                    setError("");
+                  }}
+                  className={`py-2 px-2 text-xs font-semibold rounded-xl transition-all cursor-pointer text-center ${
+                    type === "email_otp"
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Verify Email
+                </button>
                 <button
                   type="button"
                   onClick={() => {
                     setType("question");
                     setError("");
                   }}
-                  className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                  className={`py-2 px-2 text-xs font-semibold rounded-xl transition-all cursor-pointer text-center ${
                     type === "question"
                       ? "bg-violet-600 text-white shadow-sm"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                   }`}
                 >
-                  Security Question
+                  Security Q&A
                 </button>
                 <button
                   type="button"
@@ -152,7 +216,7 @@ export default function ForgotPasswordPage() {
                     setType("backup_code");
                     setError("");
                   }}
-                  className={`py-2 px-3 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                  className={`py-2 px-2 text-xs font-semibold rounded-xl transition-all cursor-pointer text-center ${
                     type === "backup_code"
                       ? "bg-violet-600 text-white shadow-sm"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -162,6 +226,28 @@ export default function ForgotPasswordPage() {
                 </button>
               </div>
             </div>
+
+            {type === "email_otp" && (
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-300 uppercase tracking-wider mb-2">
+                  Verification Code (OTP)
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.trim())}
+                  placeholder="Enter 6-digit OTP sent to email"
+                  className="w-full px-4 py-3 bg-background border border-border rounded-2xl text-violet-600 dark:text-violet-400 font-mono text-center font-bold tracking-widest text-lg focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all placeholder:font-sans placeholder:tracking-normal placeholder:font-medium placeholder:text-sm"
+                />
+                {maskedEmail && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 text-center">
+                    Sent to: <span className="font-semibold text-slate-700 dark:text-slate-300">{maskedEmail}</span>
+                  </p>
+                )}
+              </div>
+            )}
 
             {type === "question" && (
               <>

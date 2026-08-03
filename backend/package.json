@@ -20,7 +20,8 @@
     "googleapis": "^173.0.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.7.4",
-    "mongoose-aggregate-paginate-v2": "^1.1.4"
+    "mongoose-aggregate-paginate-v2": "^1.1.4",
+    "resend": "^6.18.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14",

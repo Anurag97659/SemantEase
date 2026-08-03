@@ -6,6 +6,8 @@ import jwt from "jsonwebtoken";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
+import { setOtp, verifyOtp } from "../utils/otpStore.js";
+import { sendOtpEmail } from "../utils/resend.js";
 
 const generateAccessTokenAndRefreshToken = async (userId) => {
   try {
@@ -23,61 +25,116 @@ const generateAccessTokenAndRefreshToken = async (userId) => {
   }
 };
 
-const registeruser=asyncHandler(async(req,res)=>{
-    const{username,fullname,password,securityQuestion,securityAnswer}=req.body;
-    if(!fullname){
-        throw new ApiError(400,"Fullname is required");
-   }
-    if(!password){
-        throw new ApiError(400,"Password is required");
-   }
-    if(!username){
-        throw new ApiError(400,"Username is required");
-   }
-    if(!securityQuestion || securityQuestion.trim() === ""){
-        throw new ApiError(400,"Security question is required");
-   }
-    if(!securityAnswer || securityAnswer.trim() === ""){
-        throw new ApiError(400,"Security answer is required");
-   }
+const sendRegistrationOtp = asyncHandler(async (req, res) => {
+  const { email, username } = req.body;
+  if (!email) {
+    throw new ApiError(400, "Email is required");
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) {
+    throw new ApiError(400, "Invalid email format");
+  }
 
-    const checkingUserExistance=await User.findOne({
-        username:username
-   });
-    if(checkingUserExistance){
-        throw new ApiError(409,"User already exists");
-   }
+  const existingEmail = await User.findOne({ email: email.trim().toLowerCase() });
+  if (existingEmail) {
+    throw new ApiError(409, "Email is already registered");
+  }
 
-    const backupCodes = Array.from({ length: 3 }, () => crypto.randomBytes(4).toString("hex"));
-    const hashedBackupCodes = await Promise.all(
-        backupCodes.map(code => bcrypt.hash(code, 10))
-    );
+  if (username) {
+    const existingUsername = await User.findOne({ username: username.trim().toLowerCase() });
+    if (existingUsername) {
+      throw new ApiError(409, "Username is already taken");
+    }
+  }
 
-    const user=await User.create({
-        username, 
-        fullname, 
-        password,
-        securityQuestion,
-        securityAnswer,
-        backupCodes: hashedBackupCodes
-    });
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  setOtp(`reg:${email.trim().toLowerCase()}`, otp);
 
-    const createUser=await User.findById(user._id).select("-password -refreshToken -securityAnswer -backupCodes");
-    if(!createUser){
-        throw new ApiError(500,"User creation failed due to some internal problem");
-   }
+  await sendOtpEmail(email.trim().toLowerCase(), otp, "Account Registration Verification");
 
-    return res.status(200).json(
-        new ApiResponse(
-            200, 
-            {
-                user: createUser,
-                backupCodes 
-            },
-            "User created successfully"
-        )
-    );
+  return res.status(200).json(
+    new ApiResponse(200, {}, "Verification OTP sent successfully to your email")
+  );
 });
+
+const registeruser = asyncHandler(async (req, res) => {
+  const { username, fullname, email, password, securityQuestion, securityAnswer, otp } = req.body;
+
+  if (!fullname || fullname.trim() === "") {
+    throw new ApiError(400, "Fullname is required");
+  }
+  if (!username || username.trim() === "") {
+    throw new ApiError(400, "Username is required");
+  }
+  if (!email || email.trim() === "") {
+    throw new ApiError(400, "Email is required");
+  }
+  if (!otp || otp.trim() === "") {
+    throw new ApiError(400, "OTP verification code is required");
+  }
+  if (!password) {
+    throw new ApiError(400, "Password is required");
+  }
+  if (!securityQuestion || securityQuestion.trim() === "") {
+    throw new ApiError(400, "Security question is required");
+  }
+  if (!securityAnswer || securityAnswer.trim() === "") {
+    throw new ApiError(400, "Security answer is required");
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedUsername = username.trim().toLowerCase();
+
+  // Verify OTP
+  const otpVerification = verifyOtp(`reg:${normalizedEmail}`, otp);
+  if (!otpVerification.valid) {
+    throw new ApiError(400, otpVerification.message);
+  }
+
+  const existingUser = await User.findOne({
+    $or: [{ username: normalizedUsername }, { email: normalizedEmail }]
+  });
+
+  if (existingUser) {
+    if (existingUser.username === normalizedUsername) {
+      throw new ApiError(409, "Username is already taken");
+    }
+    throw new ApiError(409, "Email is already registered");
+  }
+
+  const backupCodes = Array.from({ length: 3 }, () => crypto.randomBytes(4).toString("hex"));
+  const hashedBackupCodes = await Promise.all(
+    backupCodes.map(code => bcrypt.hash(code, 10))
+  );
+
+  const user = await User.create({
+    username: normalizedUsername, 
+    fullname, 
+    email: normalizedEmail,
+    emailVerified: true,
+    password,
+    securityQuestion,
+    securityAnswer,
+    backupCodes: hashedBackupCodes
+  });
+
+  const createUser = await User.findById(user._id).select("-password -refreshToken -securityAnswer -backupCodes");
+  if (!createUser) {
+    throw new ApiError(500, "User creation failed due to an internal server error");
+  }
+
+  return res.status(200).json(
+    new ApiResponse(
+      200, 
+      {
+        user: createUser,
+        backupCodes 
+      },
+      "User created successfully"
+    )
+  );
+});
+
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken =
@@ -240,8 +297,45 @@ const getProfile = asyncHandler(async (req, res) => {
 });
 
 
+const sendPasswordResetOtp = asyncHandler(async (req, res) => {
+  const { username } = req.body;
+  if (!username || username.trim() === "") {
+    throw new ApiError(400, "Username is required");
+  }
+
+  const normalizedUsername = username.trim().toLowerCase();
+  const user = await User.findOne({
+    $or: [{ username: normalizedUsername }, { email: normalizedUsername }]
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  if (!user.email) {
+    throw new ApiError(400, "No registered email found for this account. Please use Security Question or Backup Code.");
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  setOtp(`reset:${user.username}`, otp);
+
+  await sendOtpEmail(user.email, otp, "Password Reset Verification");
+
+  const parts = user.email.split("@");
+  const local = parts[0];
+  const domain = parts[1];
+  const maskedLocal = local.length <= 2 
+    ? local[0] + "*" 
+    : local[0] + "*".repeat(Math.max(1, local.length - 2)) + local[local.length - 1];
+  const maskedEmail = `${maskedLocal}@${domain}`;
+
+  return res.status(200).json(
+    new ApiResponse(200, { maskedEmail }, `OTP sent successfully to ${maskedEmail}`)
+  );
+});
+
 const resetPassword = asyncHandler(async (req, res) => {
-  const { username, type, securityAnswer, backupCode, newPassword } = req.body;
+  const { username, type, securityAnswer, backupCode, otp, newPassword } = req.body;
 
   if (!username) {
     throw new ApiError(400, "Username is required");
@@ -253,7 +347,9 @@ const resetPassword = asyncHandler(async (req, res) => {
     throw new ApiError(400, "New password must be at least 8 characters");
   }
 
-  const user = await User.findOne({ username: username.toLowerCase() });
+  const user = await User.findOne({
+    $or: [{ username: username.trim().toLowerCase() }, { email: username.trim().toLowerCase() }]
+  });
   if (!user) {
     throw new ApiError(404, "User not found");
   }
@@ -289,8 +385,17 @@ const resetPassword = asyncHandler(async (req, res) => {
     }
     user.backupCodes.splice(matchedIndex, 1);
   } 
+  else if (type === "email_otp") {
+    if (!otp) {
+      throw new ApiError(400, "OTP is required");
+    }
+    const otpVerification = verifyOtp(`reset:${user.username}`, otp);
+    if (!otpVerification.valid) {
+      throw new ApiError(400, otpVerification.message);
+    }
+  }
   else {
-    throw new ApiError(400, "Invalid verification type. Must be 'question' or 'backup_code'");
+    throw new ApiError(400, "Invalid verification type. Must be 'question', 'backup_code', or 'email_otp'");
   }
 
   user.password = newPassword;
@@ -301,7 +406,6 @@ const resetPassword = asyncHandler(async (req, res) => {
   );
 });
 
-
 const getSecurityQuestion = asyncHandler(async (req, res) => {
   const { username } = req.params;
   const user = await User.findOne({ username: username.toLowerCase() });
@@ -311,8 +415,8 @@ const getSecurityQuestion = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, { securityQuestion: user.securityQuestion }, "Security question fetched"));
 });
 
-
 export {
+  sendRegistrationOtp,
   registeruser,
   loginuser,
   logoutuser,
@@ -322,6 +426,8 @@ export {
   deleteUser,
   getUsername,
   getProfile,
+  sendPasswordResetOtp,
   resetPassword,
   getSecurityQuestion
 };
+
