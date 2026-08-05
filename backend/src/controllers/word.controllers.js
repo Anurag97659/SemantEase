@@ -163,10 +163,6 @@ const saveNote = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Word not found");
   }
 
-  if (word.createdBy.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You can only add notes to words you created");
-  }
-
   const cleanNote = note.trim();
   const existingNote = word.notes.find((wordNote) => wordNote.user.toString() === req.user._id.toString());
 
@@ -187,10 +183,6 @@ const deleteNote = asyncHandler(async (req, res) => {
 
   if (!word) {
     throw new ApiError(404, "Word not found");
-  }
-
-  if (word.createdBy.toString() !== req.user._id.toString()) {
-    throw new ApiError(403, "You can only delete notes from words you created");
   }
 
   const noteIndex = word.notes.findIndex(

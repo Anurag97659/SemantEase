@@ -113,7 +113,7 @@ function WordDetailsContent() {
   };
 
   const handleSaveNote = async () => {
-    if (!id || !isAuthor || !note.trim()) return;
+    if (!id || !currentUser || !note.trim()) return;
 
     setSavingNote(true);
     setNoteError("");
@@ -135,7 +135,7 @@ function WordDetailsContent() {
   };
 
 const handleDeleteNote = async () => {
-    if (!id || !isAuthor || !wordData?.note ) return;
+    if (!id || !currentUser || !wordData?.note ) return;
 
     if (!window.confirm("Are you sure you want to delete your note?")) return;
     setDeletingNote(true);
@@ -345,13 +345,13 @@ const handleDeleteNote = async () => {
               )}
             </div>
 
-            {isAuthor && (
+            {currentUser && (
               <div className="border-t border-border pt-8 mt-8">
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Your Note</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-450 mt-1 font-medium">
-                      Private to you and shown at the bottom of this word on your dashboard.
+                      Private to you — only visible to you on this word.
                     </p>
                   </div>
                   <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-450 shrink-0">
