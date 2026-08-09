@@ -41,8 +41,72 @@ export default function WordListPage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [starringWordId, setStarringWordId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [hasRestoredScroll, setHasRestoredScroll] = useState(false);
 
-  // 1. Fetch current user profile on mount
+  
+  useEffect(() => {
+    if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    if (sessionStorage.getItem("words_restore_needed") === "true") {
+      const savedSearch = sessionStorage.getItem("words_search");
+      const savedFilterType = sessionStorage.getItem("words_filter_type");
+      const savedSortOrder = sessionStorage.getItem("words_sort_order");
+      const savedUsernameFilter = sessionStorage.getItem("words_username_filter");
+
+      if (savedSearch !== null) setSearch(savedSearch);
+      if (savedFilterType === "all" || savedFilterType === "mine" || savedFilterType === "important") {
+        setFilterType(savedFilterType);
+      }
+      if (savedSortOrder === "newest" || savedSortOrder === "oldest" || savedSortOrder === "username") {
+        setSortOrder(savedSortOrder);
+      }
+      if (savedUsernameFilter !== null) setUsernameFilter(savedUsernameFilter);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 0) {
+        sessionStorage.setItem("words_scroll_pos", window.scrollY.toString());
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const saveStateBeforeNavigate = () => {
+    sessionStorage.setItem("words_scroll_pos", window.scrollY.toString());
+    sessionStorage.setItem("words_filter_type", filterType);
+    sessionStorage.setItem("words_sort_order", sortOrder);
+    sessionStorage.setItem("words_search", search);
+    sessionStorage.setItem("words_username_filter", usernameFilter);
+    sessionStorage.setItem("words_restore_needed", "true");
+  };
+
+  
+  useEffect(() => {
+    if (!loading && !searchLoading && words.length > 0 && !hasRestoredScroll) {
+      if (sessionStorage.getItem("words_restore_needed") === "true") {
+        const savedPos = sessionStorage.getItem("words_scroll_pos");
+        if (savedPos) {
+          const scrollY = parseInt(savedPos, 10);
+          if (!isNaN(scrollY) && scrollY > 0) {
+            setHasRestoredScroll(true);
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: scrollY, behavior: "instant" });
+              setTimeout(() => {
+                window.scrollTo({ top: scrollY, behavior: "instant" });
+              }, 60);
+            });
+          }
+        }
+        sessionStorage.removeItem("words_restore_needed");
+      }
+    }
+  }, [loading, searchLoading, words, hasRestoredScroll]);
+
   useEffect(() => {
     apiFetch("/WoahCab/users/getProfile")
       .then((res) => {
@@ -332,7 +396,7 @@ const formatUploadDate = (date?: string) => {
                     </svg>
                   </button>
 
-                  <Link href={`/words/details?id=${item._id}`} className="block h-full">
+                  <Link href={`/words/details?id=${item._id}`} onClick={saveStateBeforeNavigate} className="block h-full">
                   <div>
                     <div className="flex flex-col gap-1 mb-4 pr-10">
                       <div className="flex items-center gap-2">

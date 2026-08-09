@@ -50,6 +50,70 @@ function BlendDetailsContent() {
   const [starringWordId, setStarringWordId] = useState<string | null>(null);
   const [deletingBlend, setDeletingBlend] = useState(false);
   const [error, setError] = useState("");
+  const [hasRestoredScroll, setHasRestoredScroll] = useState(false);
+
+  // Restore filter & search state on mount if coming back from word details
+  useEffect(() => {
+    if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    if (sessionStorage.getItem("blend_words_restore_needed") === "true") {
+      const savedSearch = sessionStorage.getItem("blend_words_search");
+      const savedFilterType = sessionStorage.getItem("blend_words_filter_type");
+      const savedSortOrder = sessionStorage.getItem("blend_words_sort_order");
+
+      if (savedSearch !== null) setSearch(savedSearch);
+      if (savedFilterType === "all" || savedFilterType === "mine" || savedFilterType === "important") {
+        setFilterType(savedFilterType);
+      }
+      if (savedSortOrder === "newest" || savedSortOrder === "oldest") {
+        setSortOrder(savedSortOrder);
+      }
+    }
+  }, []);
+
+  // Track scroll position continuously
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 0) {
+        sessionStorage.setItem("blend_words_scroll_pos", window.scrollY.toString());
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Helper to save current blend word list state before navigating to details
+  const saveStateBeforeNavigate = () => {
+    sessionStorage.setItem("blend_words_scroll_pos", window.scrollY.toString());
+    sessionStorage.setItem("blend_words_filter_type", filterType);
+    sessionStorage.setItem("blend_words_sort_order", sortOrder);
+    sessionStorage.setItem("blend_words_search", search);
+    sessionStorage.setItem("blend_words_restore_needed", "true");
+  };
+
+  // Restore scroll position once blend words are loaded and rendered
+  useEffect(() => {
+    if (!loading && !searchLoading && words.length > 0 && !hasRestoredScroll) {
+      if (sessionStorage.getItem("blend_words_restore_needed") === "true") {
+        const savedPos = sessionStorage.getItem("blend_words_scroll_pos");
+        if (savedPos) {
+          const scrollY = parseInt(savedPos, 10);
+          if (!isNaN(scrollY) && scrollY > 0) {
+            setHasRestoredScroll(true);
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: scrollY, behavior: "instant" });
+              setTimeout(() => {
+                window.scrollTo({ top: scrollY, behavior: "instant" });
+              }, 60);
+            });
+          }
+        }
+        sessionStorage.removeItem("blend_words_restore_needed");
+      }
+    }
+  }, [loading, searchLoading, words, hasRestoredScroll]);
 
   useEffect(() => {
     if (!blendId) return;
@@ -281,7 +345,7 @@ function BlendDetailsContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.24l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" />
                   </svg>
                 </button>
-                <Link href={`/words/details?id=${item._id}`} className="block h-full">
+                <Link href={`/words/details?id=${item._id}`} onClick={saveStateBeforeNavigate} className="block h-full">
                   <div>
                     <div className="flex flex-col gap-1 mb-4 pr-10">
                       <div className="flex items-center gap-2">
