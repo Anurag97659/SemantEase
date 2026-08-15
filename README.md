@@ -106,6 +106,9 @@ ACCESS_TOKEN_EXPIRY=1d
 REFRESH_TOKEN_EXPIRY=8d
 GEMINI_API_KEY=your_gemini_api_key_from_ai_studio
 
+# Free Dictionary API requires no API key.
+# Optional: set FREE_DICTIONARY_API_BASE_URL to use a self-hosted compatible service.
+
 # Google OAuth (get from https://console.cloud.google.com)
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret

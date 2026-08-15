@@ -5,18 +5,29 @@ import { useRouter } from "next/navigation";
 import Navbar from "../../../components/Navbar";
 import { apiFetch } from "../../../utils/api";
 
-const loadingSteps = [
-  "Connecting to Gemini AI...",
-  "Retrieving dictionary definition...",
-  "Formatting parts of speech (noun, adjective, adverb)...",
-  "Curating exact synonyms and antonyms...",
-  "Composing contextual sentence examples...",
-  "Saving word entry to database..."
-];
+const loadingSteps = {
+  "free-dictionary": [
+    "Connecting to Free Dictionary...",
+    "Retrieving dictionary definition...",
+    "Organizing parts of speech...",
+    "Collecting available synonyms and antonyms...",
+    "Adding example sentences...",
+    "Saving word entry to database...",
+  ],
+  gemini: [
+    "Connecting to Gemini AI...",
+    "Retrieving dictionary definition...",
+    "Formatting parts of speech (noun, adjective, adverb)...",
+    "Curating exact synonyms and antonyms...",
+    "Composing contextual sentence examples...",
+    "Saving word entry to database...",
+  ],
+};
 
 export default function SubmitWordPage() {
   const router = useRouter();
   const [word, setWord] = useState("");
+  const [source, setSource] = useState<"free-dictionary" | "gemini">("gemini");
   const [loading, setLoading] = useState(false);
   const [loadingStepIdx, setLoadingStepIdx] = useState(0);
   const [error, setError] = useState("");
@@ -32,13 +43,13 @@ export default function SubmitWordPage() {
     let interval: NodeJS.Timeout;
     if (loading) {
       interval = setInterval(() => {
-        setLoadingStepIdx((prev) => (prev + 1) % loadingSteps.length);
+        setLoadingStepIdx((prev) => (prev + 1) % loadingSteps[source].length);
       }, 2000);
     } else {
       setLoadingStepIdx(0);
     }
     return () => clearInterval(interval);
-  }, [loading]);
+  }, [loading, source]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +61,7 @@ export default function SubmitWordPage() {
     try {
       await apiFetch("/WoahCab/words/createword", {
         method: "POST",
-        body: JSON.stringify({ word: word.trim() }),
+        body: JSON.stringify({ word: word.trim(), source }),
       });
       router.push("/words");
     } catch (err: any) {
@@ -80,7 +91,7 @@ export default function SubmitWordPage() {
 
               <h2 className="text-xl font-bold mb-2">Analyzing word: "{word}"</h2>
               <p className="text-violet-650 dark:text-violet-450 font-bold text-sm min-h-[20px] transition-all duration-300">
-                {loadingSteps[loadingStepIdx]}
+                {loadingSteps[source][loadingStepIdx]}
               </p>
             </div>
           ) : (
@@ -88,7 +99,7 @@ export default function SubmitWordPage() {
               <div className="mb-6">
                 <h1 className="text-2xl font-bold mb-1">Add New Word</h1>
                 <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">
-                  Type any English word. Gemini AI will automatically fetch the definition, part of speech, antonyms, synonyms, and sentences.
+                  Choose a source for the word details. Gemini AI is selected by default.
                 </p>
               </div>
 
@@ -113,6 +124,20 @@ export default function SubmitWordPage() {
                   />
                 </div>
 
+                <fieldset>
+                  <legend className="block text-xs font-bold text-slate-800 dark:text-slate-300 uppercase tracking-wider mb-2">
+                    Definition Source
+                  </legend>
+                  <select
+                    value={source}
+                    onChange={(event) => setSource(event.target.value as "free-dictionary" | "gemini")}
+                    className="w-full appearance-none px-5 py-4 bg-background border border-border rounded-2xl text-slate-900 dark:text-slate-100 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all font-medium cursor-pointer"
+                  >
+                    <option value="gemini">Gemini AI</option>
+                    <option value="free-dictionary">Free Dictionary </option>
+                  </select>
+                </fieldset>
+
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -125,7 +150,7 @@ export default function SubmitWordPage() {
                     type="submit"
                     className="flex-2 py-4 px-6 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-semibold rounded-2xl transition-all duration-300 hover:shadow-lg hover:shadow-violet-600/20 active:scale-95 text-sm"
                   >
-                    Generate & Add
+                    {source === "gemini" ? "Generate & Add" : "Find & Add"}
                   </button>
                 </div>
               </form>

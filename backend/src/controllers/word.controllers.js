@@ -23,8 +23,82 @@ const formatWordForViewer = (word, userId) => {
     : { ...safeWord, isStarred };
 };
 
+const parseFreeDictionaryWord = (payload) => {
+  const entry = Array.isArray(payload) ? payload[0] : null;
+  if (!entry?.meanings) return null;
+
+  const data = {
+    definitions: [],
+    examples: new Set(),
+    synonyms: new Set(),
+    antonyms: new Set(),
+    definitionKeys: new Set(),
+  };
+
+  for (const meaning of entry.meanings) {
+    const partOfSpeech = meaning.partOfSpeech || "definition";
+    for (const item of meaning.definitions || []) {
+      if (item.definition?.trim()) {
+        const key = `${partOfSpeech}:${item.definition}`.toLowerCase();
+        if (!data.definitionKeys.has(key)) {
+          data.definitionKeys.add(key);
+          data.definitions.push({ partOfSpeech, definition: item.definition.trim() });
+        }
+      }
+      if (item.example?.trim()) data.examples.add(item.example.trim());
+      for (const synonym of [...(meaning.synonyms || []), ...(item.synonyms || [])]) {
+        if (synonym?.trim()) data.synonyms.add(synonym.trim());
+      }
+      for (const antonym of [...(meaning.antonyms || []), ...(item.antonyms || [])]) {
+        if (antonym?.trim()) data.antonyms.add(antonym.trim());
+      }
+    }
+  }
+
+  if (!data.definitions.length) return null;
+
+  return {
+    phonetic: entry.phonetic || entry.phonetics?.find((item) => item.text)?.text || "",
+    definitions: data.definitions,
+    examples: [...data.examples].slice(0, 3),
+    synonyms: [...data.synonyms].slice(0, 5),
+    antonyms: [...data.antonyms].slice(0, 5),
+  };
+};
+
+const getFreeDictionaryWordDetails = async (cleanWord) => {
+  const baseUrl = (process.env.FREE_DICTIONARY_API_BASE_URL || "https://api.dictionaryapi.dev/api/v2").replace(/\/$/, "");
+  let response;
+  try {
+    response = await fetch(`${baseUrl}/entries/en/${encodeURIComponent(cleanWord)}`);
+  } catch (error) {
+    throw new ApiError(502, "Could not reach Free Dictionary. Please try again.");
+  }
+
+  if (response.status === 404) {
+    throw new ApiError(404, "No Free Dictionary entry was found for this word.");
+  }
+  if (!response.ok) {
+    throw new ApiError(502, `Free Dictionary lookup failed (${response.status}).`);
+  }
+
+  const parsedWord = parseFreeDictionaryWord(await response.json());
+  if (!parsedWord) {
+    throw new ApiError(404, "Free Dictionary did not return a definition for this word.");
+  }
+
+  return parsedWord;
+};
+
+const sourceNames = {
+  "free-dictionary": "Free Dictionary",
+  gemini: "Gemini",
+};
+
 const createWord = asyncHandler(async (req, res) => {
-  const { word } = req.body;
+  const { word, source = "gemini" } = req.body;
+  // Keep the initial Dictionary value working for clients that have not refreshed yet.
+  const normalizedSource = source === "dictionary" ? "free-dictionary" : source;
   const userId = req.user._id;
 
   if (!word || word.trim() === "") {
@@ -48,18 +122,26 @@ const createWord = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Word already exists in the database");
   }
 
-  if (!process.env.GEMINI_API_KEY) {
-    throw new ApiError(500, "GEMINI_API_KEY is not configured in backend environment variables");
+  if (!Object.hasOwn(sourceNames, normalizedSource)) {
+    throw new ApiError(400, "Source must be free-dictionary or gemini");
   }
 
+  let generatedData;
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-flash-lite",
-      generationConfig: { responseMimeType: "application/json" }
-    });
+    if (normalizedSource === "free-dictionary") {
+      generatedData = await getFreeDictionaryWordDetails(cleanWord);
+    } else {
+      if (!process.env.GEMINI_API_KEY) {
+        throw new ApiError(500, "GEMINI_API_KEY is not configured in backend environment variables");
+      }
 
-    const prompt = `Generate a vocabulary dictionary entry for the English word "${cleanWord}". 
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({
+        model: "gemini-3.1-flash-lite",
+        generationConfig: { responseMimeType: "application/json" }
+      });
+
+      const prompt = `Generate a vocabulary dictionary entry for the English word "${cleanWord}". 
 Return a JSON object matching this exact structure:
 {
   "phonetic": "Phonetic transcription of the word in IPA format",
@@ -78,22 +160,23 @@ return a JSON object with the following structure:
 {"error": "Invalid input or unable to generate dictionary entry"}
 Provide definitions for different parts of speech if applicable (e.g. noun, adjective, adverb). Ensure all list fields are array of strings. Do not include any markdown styling like \`\`\`json. Return only the JSON object.`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
     
-    let generatedData;
-    try {
-      generatedData = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error("Gemini raw response:", responseText);
-      console.error("Parse error details:", parseError);
-      throw new ApiError(500, "Failed to parse dictionary response from Gemini");
+      try {
+        generatedData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("Gemini raw response:", responseText);
+        console.error("Parse error details:", parseError);
+        throw new ApiError(500, "Failed to parse dictionary response from Gemini");
+      }
+      if (generatedData.error) {
+        throw new ApiError(400, `Gemini error: ${generatedData.error}`);
+      }
     }
-    if (generatedData.error) {
-      throw new ApiError(400, `Gemini error: ${generatedData.error}`);
-    }
+
     if (!generatedData.definitions || !Array.isArray(generatedData.definitions)) {
-      throw new ApiError(500, "Invalid definitions format returned from Gemini");
+      throw new ApiError(500, `Invalid definitions format returned from ${sourceNames[normalizedSource]}`);
     }
 
     const newWord = await Word.create({
@@ -109,7 +192,7 @@ Provide definitions for different parts of speech if applicable (e.g. noun, adje
     res.status(201).json(new ApiResponse(201, formatWordForViewer(newWord, userId), "Word created successfully"));
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError(500, `Error generating word details via Gemini: ${error.message}`);
+    throw new ApiError(500, `Error generating word details via ${sourceNames[normalizedSource]}: ${error.message}`);
   }
 });
 
