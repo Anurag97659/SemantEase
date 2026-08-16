@@ -122,6 +122,12 @@ MICROSOFT_REDIRECT_URI=http://localhost:8000/WoahCab/oauth/microsoft/callback
 
 # Frontend URL (used for post-OAuth redirect)
 FRONTEND_URL=http://localhost:3000
+
+# Email notifications for new suggestions. If omitted, the email address of
+# the account identified by ADMIN_USERNAME is used.
+ADMIN_EMAIL=admin@example.com
+RESEND_API_KEY=your_resend_api_key
+RESEND_FROM_EMAIL=your_verified_resend_sender
 ```
 
 ### 3. Run Applications

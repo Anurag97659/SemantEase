@@ -2,10 +2,28 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Suggestion } from "../models/suggestion.model.js";
+import { User } from "../models/user.model.js";
+import { sendSuggestionNotificationEmail } from "../utils/resend.js";
 
 const getAdminUsername = () => {
-  const envAdmin = process.env.ADMIN_USERNAME;
+  const envAdmin = process.env.ADMIN_USERNAME || "";
   return envAdmin.replace(/;/g, "").replace(/['"]/g, "").trim().toLowerCase();
+};
+
+const getAdminEmail = async () => {
+  const configuredEmail = process.env.ADMIN_EMAIL?.trim();
+  if (configuredEmail) return configuredEmail;
+
+  const adminUsername = getAdminUsername();
+  const admin = await User.findOne({ username: adminUsername }).select("email");
+  if (!admin?.email) {
+    throw new ApiError(
+      500,
+      "Admin notification email is not configured. Set ADMIN_EMAIL or add an email to the admin account."
+    );
+  }
+
+  return admin.email;
 };
 
 export const createSuggestion = asyncHandler(async (req, res) => {
@@ -19,6 +37,7 @@ export const createSuggestion = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Suggestion message is required");
   }
 
+  const adminEmail = await getAdminEmail();
   const suggestion = await Suggestion.create({
     user: req.user._id,
     username: req.user.username,
@@ -26,6 +45,13 @@ export const createSuggestion = asyncHandler(async (req, res) => {
     message: message.trim(),
     category: category || "Feature Request",
   });
+
+  try {
+    await sendSuggestionNotificationEmail(adminEmail, suggestion);
+  } catch (error) {
+    await suggestion.deleteOne();
+    throw error;
+  }
 
   return res
     .status(201)
