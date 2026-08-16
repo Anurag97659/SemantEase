@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Navbar from "../../components/Navbar";
 import { apiFetch } from "../../utils/api";
 
@@ -10,9 +9,13 @@ interface UserProfile {
   _id: string;
   username: string;
   fullname: string;
+  email?: string;
   securityQuestion: string;
   createdAt: string;
 }
+
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error && error.message ? error.message : fallback;
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -27,6 +30,14 @@ export default function SettingsPage() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState("");
   const [detailsSuccess, setDetailsSuccess] = useState("");
+
+  // Change Email form state
+  const [newEmail, setNewEmail] = useState("");
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState("");
 
   // Change Password form state
   const [oldPassword, setOldPassword] = useState("");
@@ -48,9 +59,10 @@ export default function SettingsPage() {
           setProfile(res.data);
           setNewUsername(res.data.username);
           setNewFullname(res.data.fullname);
+          setNewEmail(res.data.email || "");
         }
       })
-      .catch((err) => {
+      .catch(() => {
         // Redirect to login if unauthorized
         router.push("/login");
       })
@@ -77,10 +89,56 @@ export default function SettingsPage() {
         setProfile(res.data);
         setDetailsSuccess("Details updated successfully!");
       }
-    } catch (err: any) {
-      setDetailsError(err.message || "Failed to update details");
+    } catch (err: unknown) {
+      setDetailsError(getErrorMessage(err, "Failed to update details"));
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const handleSendEmailChangeOtp = async () => {
+    setEmailLoading(true);
+    setEmailError("");
+    setEmailSuccess("");
+
+    try {
+      await apiFetch("/WoahCab/users/send-email-change-otp", {
+        method: "POST",
+        body: JSON.stringify({ email: newEmail }),
+      });
+      setEmailOtpSent(true);
+      setEmailSuccess("A verification code has been sent to your new email address.");
+    } catch (err: unknown) {
+      setEmailError(getErrorMessage(err, "Failed to send verification code"));
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
+  const handleChangeEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailOtpSent) {
+      setEmailError("Send a verification code before changing your email.");
+      return;
+    }
+
+    setEmailLoading(true);
+    setEmailError("");
+    setEmailSuccess("");
+
+    try {
+      const res = await apiFetch("/WoahCab/users/change-email", {
+        method: "POST",
+        body: JSON.stringify({ email: newEmail, otp: emailOtp }),
+      });
+      if (res?.data) setProfile(res.data);
+      setEmailOtp("");
+      setEmailOtpSent(false);
+      setEmailSuccess("Email address changed successfully!");
+    } catch (err: unknown) {
+      setEmailError(getErrorMessage(err, "Failed to change email"));
+    } finally {
+      setEmailLoading(false);
     }
   };
 
@@ -107,8 +165,8 @@ export default function SettingsPage() {
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err: any) {
-      setPasswordError(err.message || "Failed to update password");
+    } catch (err: unknown) {
+      setPasswordError(getErrorMessage(err, "Failed to update password"));
     } finally {
       setPasswordLoading(false);
     }
@@ -128,8 +186,8 @@ export default function SettingsPage() {
         method: "POST",
       });
       router.push("/login");
-    } catch (err: any) {
-      setDeleteError(err.message || "Failed to delete account");
+    } catch (err: unknown) {
+      setDeleteError(getErrorMessage(err, "Failed to delete account"));
       setDeleteLoading(false);
     }
   };
@@ -188,7 +246,7 @@ export default function SettingsPage() {
                     Security Question
                   </span>
                   <span className="text-foreground italic">
-                    "{profile?.securityQuestion}"
+                    &ldquo;{profile?.securityQuestion}&rdquo;
                   </span>
                 </div>
                 <div>
@@ -289,6 +347,109 @@ export default function SettingsPage() {
                   >
                     {detailsLoading ? "Saving Changes..." : "Save Details"}
                   </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Change Email Form */}
+            <div className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-sm">
+              <h3 className="text-lg font-bold mb-1">Change Email</h3>
+              <p className="text-xs text-text-muted mb-6">
+                Verify your new email address with a one-time code before it is saved.
+              </p>
+
+              {emailError && (
+                <div className="mb-4 p-3.5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-500 dark:text-red-400 text-xs text-center animate-fade-in">
+                  {emailError}
+                </div>
+              )}
+
+              {emailSuccess && (
+                <div className="mb-4 p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs text-center animate-fade-in">
+                  {emailSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleChangeEmail} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                    New Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={newEmail}
+                    disabled={emailOtpSent}
+                    onChange={(e) => {
+                      setNewEmail(e.target.value);
+                      setEmailOtp("");
+                      setEmailOtpSent(false);
+                    }}
+                    placeholder="you@example.com"
+                    className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all text-sm font-medium disabled:opacity-60"
+                  />
+                </div>
+
+                {emailOtpSent && (
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                      Verification Code
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      required
+                      maxLength={6}
+                      value={emailOtp}
+                      onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="Enter 6-digit code"
+                      className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all text-sm font-medium"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-wrap justify-end gap-3 pt-2">
+                  {!emailOtpSent ? (
+                    <button
+                      type="button"
+                      onClick={handleSendEmailChangeOtp}
+                      disabled={emailLoading || !newEmail.trim()}
+                      className="py-3 px-6 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium rounded-xl text-xs transition-all duration-300 disabled:opacity-50 active:scale-95 cursor-pointer"
+                    >
+                      {emailLoading ? "Sending Code..." : "Send Verification Code"}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEmailOtp("");
+                          setEmailOtpSent(false);
+                          setEmailError("");
+                          setEmailSuccess("");
+                        }}
+                        disabled={emailLoading}
+                        className="py-3 px-6 border border-border hover:bg-muted text-foreground font-medium rounded-xl text-xs transition-all duration-300 disabled:opacity-50 active:scale-95 cursor-pointer"
+                      >
+                        Use Different Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSendEmailChangeOtp}
+                        disabled={emailLoading}
+                        className="py-3 px-6 border border-border hover:bg-muted text-foreground font-medium rounded-xl text-xs transition-all duration-300 disabled:opacity-50 active:scale-95 cursor-pointer"
+                      >
+                        Resend Code
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={emailLoading || emailOtp.length !== 6}
+                        className="py-3 px-6 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium rounded-xl text-xs transition-all duration-300 disabled:opacity-50 active:scale-95 cursor-pointer"
+                      >
+                        {emailLoading ? "Verifying..." : "Verify & Change Email"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </form>
             </div>

@@ -272,6 +272,85 @@ const updateDetails=asyncHandler(async(req,res)=>{
         );
 });
 
+const sendEmailChangeOtp = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email || email.trim() === "") {
+    throw new ApiError(400, "New email is required");
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    throw new ApiError(400, "Invalid email format");
+  }
+
+  const currentUser = await User.findById(req.user?._id).select("email");
+  if (!currentUser) {
+    throw new ApiError(404, "User not found");
+  }
+  if (currentUser.email === normalizedEmail) {
+    throw new ApiError(400, "This is already your current email address");
+  }
+
+  const existingEmail = await User.findOne({
+    email: normalizedEmail,
+    _id: { $ne: req.user._id },
+  });
+  if (existingEmail) {
+    throw new ApiError(409, "Email is already registered");
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  setOtp(`email-change:${req.user._id}:${normalizedEmail}`, otp);
+  await sendOtpEmail(normalizedEmail, otp, "Email Change Verification");
+
+  return res.status(200).json(
+    new ApiResponse(200, {}, "Verification OTP sent to your new email address")
+  );
+});
+
+const changeEmail = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || email.trim() === "") {
+    throw new ApiError(400, "New email is required");
+  }
+  if (!otp || otp.trim() === "") {
+    throw new ApiError(400, "Verification OTP is required");
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    throw new ApiError(400, "Invalid email format");
+  }
+
+  const otpVerification = verifyOtp(
+    `email-change:${req.user._id}:${normalizedEmail}`,
+    otp
+  );
+  if (!otpVerification.valid) {
+    throw new ApiError(400, otpVerification.message);
+  }
+
+  const existingEmail = await User.findOne({
+    email: normalizedEmail,
+    _id: { $ne: req.user._id },
+  });
+  if (existingEmail) {
+    throw new ApiError(409, "Email is already registered");
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: { email: normalizedEmail, emailVerified: true } },
+    { new: true }
+  ).select("-password -refreshToken -securityAnswer -backupCodes");
+
+  return res.status(200).json(
+    new ApiResponse(200, user, "Email changed successfully")
+  );
+});
+
 const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndDelete(req.user?._id);
   if (!user) throw new ApiError(404, "User not found");
@@ -422,6 +501,8 @@ export {
   logoutuser,
   changeCurrentPassword,
   updateDetails,
+  sendEmailChangeOtp,
+  changeEmail,
   refreshAccessToken,
   deleteUser,
   getUsername,
@@ -430,4 +511,3 @@ export {
   resetPassword,
   getSecurityQuestion
 };
-

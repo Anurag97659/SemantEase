@@ -6,6 +6,8 @@ import {
   logoutuser,
   changeCurrentPassword,
   updateDetails,
+  sendEmailChangeOtp,
+  changeEmail,
   refreshAccessToken,
   deleteUser,
   getUsername,
@@ -31,6 +33,8 @@ router.route("/refreshToken").get(refreshAccessToken);
 router.route("/getUsername").get(verifyJWT, getUsername);
 router.route("/getProfile").get(verifyJWT, getProfile);
 router.route("/updateDetails").post(verifyJWT, updateDetails);
+router.route("/send-email-change-otp").post(verifyJWT, sendEmailChangeOtp);
+router.route("/change-email").post(verifyJWT, changeEmail);
 router.route("/changePassword").post(verifyJWT, changeCurrentPassword);
 router.route("/delete").post(verifyJWT, deleteUser);
 
