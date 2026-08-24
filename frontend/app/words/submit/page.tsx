@@ -26,11 +26,27 @@ const loadingSteps = {
 
 export default function SubmitWordPage() {
   const router = useRouter();
-  const [word, setWord] = useState("");
+  const [words, setWords] = useState([""]);
   const [source, setSource] = useState<"free-dictionary" | "gemini">("gemini");
   const [loading, setLoading] = useState(false);
   const [loadingStepIdx, setLoadingStepIdx] = useState(0);
   const [error, setError] = useState("");
+
+  const updateWord = (index: number, value: string) => {
+    setWords((currentWords) =>
+      currentWords.map((currentWord, currentIndex) =>
+        currentIndex === index ? value : currentWord
+      )
+    );
+  };
+
+  const addWordField = () => {
+    setWords((currentWords) => [...currentWords, ""]);
+  };
+
+  const removeWordField = (index: number) => {
+    setWords((currentWords) => currentWords.filter((_, currentIndex) => currentIndex !== index));
+  };
 
   useEffect(() => {
     // Redirect to login if user is not authenticated
@@ -53,16 +69,19 @@ export default function SubmitWordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!word.trim()) return;
+    const submittedWords = words.map((currentWord) => currentWord.trim()).filter(Boolean);
+    if (!submittedWords.length) return;
 
     setLoading(true);
     setError("");
 
     try {
-      await apiFetch("/WoahCab/words/createword", {
-        method: "POST",
-        body: JSON.stringify({ word: word.trim(), source }),
-      });
+      for (const submittedWord of submittedWords) {
+        await apiFetch("/WoahCab/words/createword", {
+          method: "POST",
+          body: JSON.stringify({ word: submittedWord, source }),
+        });
+      }
       router.push("/words");
     } catch (err: any) {
       setError(err.message || "Failed to generate word details");
@@ -89,7 +108,9 @@ export default function SubmitWordPage() {
                 </svg>
               </div>
 
-              <h2 className="text-xl font-bold mb-2">Analyzing word: "{word}"</h2>
+              <h2 className="text-xl font-bold mb-2">
+                Analyzing {words.filter((currentWord) => currentWord.trim()).length === 1 ? "word" : "words"}
+              </h2>
               <p className="text-violet-650 dark:text-violet-450 font-bold text-sm min-h-[20px] transition-all duration-300">
                 {loadingSteps[source][loadingStepIdx]}
               </p>
@@ -112,16 +133,40 @@ export default function SubmitWordPage() {
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="block text-xs font-bold text-slate-800 dark:text-slate-300 uppercase tracking-wider mb-2">
-                    English Word
+                    English Words
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={word}
-                    onChange={(e) => setWord(e.target.value)}
-                    placeholder="e.g. ephemeral"
-                    className="w-full px-5 py-4 bg-background border border-border rounded-2xl text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all font-medium"
-                  />
+                  <div className="space-y-3">
+                    {words.map((currentWord, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          required={index === 0}
+                          value={currentWord}
+                          onChange={(e) => updateWord(index, e.target.value)}
+                          placeholder={index === 0 ? "e.g. ephemeral" : "e.g. serendipity"}
+                          className="min-w-0 flex-1 px-5 py-4 bg-background border border-border rounded-2xl text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all font-medium"
+                        />
+                        {words.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeWordField(index)}
+                            aria-label={`Remove word ${index + 1}`}
+                            className="w-12 shrink-0 rounded-2xl border border-border bg-card text-slate-500 transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-500"
+                          >
+                            −
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addWordField}
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-violet-600 transition-colors hover:bg-violet-500/10 dark:text-violet-400"
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-current text-base leading-none">+</span>
+                    Add another word
+                  </button>
                 </div>
 
                 <fieldset>
