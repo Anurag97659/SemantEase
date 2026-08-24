@@ -24,6 +24,9 @@ const loadingSteps = {
   ],
 };
 
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "Failed to generate word details";
+
 export default function SubmitWordPage() {
   const router = useRouter();
   const [words, setWords] = useState([""]);
@@ -31,6 +34,7 @@ export default function SubmitWordPage() {
   const [loading, setLoading] = useState(false);
   const [loadingStepIdx, setLoadingStepIdx] = useState(0);
   const [error, setError] = useState("");
+  const [duplicateWord, setDuplicateWord] = useState<string | null>(null);
 
   const updateWord = (index: number, value: string) => {
     setWords((currentWords) =>
@@ -61,8 +65,6 @@ export default function SubmitWordPage() {
       interval = setInterval(() => {
         setLoadingStepIdx((prev) => (prev + 1) % loadingSteps[source].length);
       }, 2000);
-    } else {
-      setLoadingStepIdx(0);
     }
     return () => clearInterval(interval);
   }, [loading, source]);
@@ -73,18 +75,44 @@ export default function SubmitWordPage() {
     if (!submittedWords.length) return;
 
     setLoading(true);
+    setLoadingStepIdx(0);
     setError("");
+    setDuplicateWord(null);
 
     try {
-      for (const submittedWord of submittedWords) {
-        await apiFetch("/WoahCab/words/createword", {
-          method: "POST",
-          body: JSON.stringify({ word: submittedWord, source }),
-        });
+      const normalizedWords = submittedWords.map((submittedWord) =>
+        submittedWord.replace(/\s+/g, " ").toLowerCase()
+      );
+      const repeatedWord = normalizedWords.find(
+        (submittedWord, index) => normalizedWords.indexOf(submittedWord) !== index
+      );
+      if (repeatedWord) {
+        setError(`Remove the repeated word "${repeatedWord}" before adding this list.`);
+        setLoading(false);
+        return;
+      }
+
+      for (let index = 0; index < submittedWords.length; index += 1) {
+        const submittedWord = submittedWords[index];
+        try {
+          await apiFetch("/WoahCab/words/createword", {
+            method: "POST",
+            body: JSON.stringify({ word: submittedWord, source }),
+          });
+        } catch (err) {
+            setWords(submittedWords.slice(index));
+          throw err;
+        }
       }
       router.push("/words");
-    } catch (err: any) {
-      setError(err.message || "Failed to generate word details");
+    } catch (err) {
+      const message = getErrorMessage(err);
+      const duplicateMatch = /^Word "(.+)" already exists in the dictionary$/.exec(message);
+      if (duplicateMatch) {
+        setDuplicateWord(duplicateMatch[1]);
+      } else {
+        setError(message);
+      }
       setLoading(false);
     }
   };
@@ -127,6 +155,11 @@ export default function SubmitWordPage() {
               {error && (
                 <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm text-center font-medium">
                   {error}
+                </div>
+              )}
+              {duplicateWord && (
+                <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm text-center font-medium">
+                  Word <strong>{duplicateWord}</strong> already exists in the dictionary.
                 </div>
               )}
 

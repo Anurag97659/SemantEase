@@ -95,9 +95,92 @@ const sourceNames = {
   gemini: "Gemini",
 };
 
+const hasUsableDefinitions = (data) =>
+  Array.isArray(data?.definitions) &&
+  data.definitions.some(
+    (item) =>
+      typeof item?.partOfSpeech === "string" &&
+      item.partOfSpeech.trim() &&
+      typeof item?.definition === "string" &&
+      item.definition.trim()
+  );
+
+const parseGeminiJson = (responseText) => {
+  
+  const jsonText = responseText
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
+
+  return JSON.parse(jsonText);
+};
+
+const getGeminiWordDetails = async (cleanWord) => {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new ApiError(500, "GEMINI_API_KEY is not configured in backend environment variables");
+  }
+
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({
+    model: "gemini-3.1-flash-lite",
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.2,
+    },
+  });
+
+  const prompt = `Create a reliable vocabulary dictionary entry for the English term "${cleanWord}".
+First decide whether it is a recognisable English word, established phrase, or idiom. If it is, generate the entry even if it is uncommon, inflected, or has more than one part of speech. Only return an error when it is clearly gibberish, a question, or not a dictionary term.
+
+Return only a JSON object matching this structure:
+{
+  "phonetic": "IPA pronunciation, or an empty string when unavailable",
+  "definitions": [
+    {
+      "partOfSpeech": "noun",
+      "definition": "Clear, concise definition"
+    }
+  ],
+  "synonyms": ["up to 5 synonyms"],
+  "antonyms": ["up to 5 antonyms"],
+  "examples": ["up to 3 complete sentence examples"]
+}
+
+Every definition must have a non-empty partOfSpeech and definition. All list fields must be arrays of strings. Do not include markdown or commentary.
+For an invalid term, return only {"error":"Invalid input"}.`;
+
+  let lastFailure;
+  
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const result = await model.generateContent(prompt);
+      const generatedData = parseGeminiJson(result.response.text());
+
+      if (generatedData?.error) {
+        lastFailure = "invalid";
+        continue;
+      }
+      if (hasUsableDefinitions(generatedData)) {
+        return generatedData;
+      }
+
+      lastFailure = "invalid-format";
+    } catch (error) {
+      lastFailure = error;
+      console.error(`Gemini dictionary attempt ${attempt + 1} failed:`, error);
+    }
+  }
+
+  if (lastFailure === "invalid") {
+    throw new ApiError(422, `Gemini could not find a dictionary entry for "${cleanWord}". Check the spelling and try again.`);
+  }
+
+  throw new ApiError(502, "Gemini could not generate the dictionary entry. Please try again.");
+};
+
 const createWord = asyncHandler(async (req, res) => {
   const { word, source = "gemini" } = req.body;
-  // Keep the initial Dictionary value working for clients that have not refreshed yet.
+  
   const normalizedSource = source === "dictionary" ? "free-dictionary" : source;
   const userId = req.user._id;
 
@@ -113,13 +196,13 @@ const createWord = asyncHandler(async (req, res) => {
   if (!/^[a-zA-Z\s']+$/.test(word.trim())) {
     throw new ApiError(400, "Word must contain only alphabetic characters");
   }
-  const cleanWord = word.trim().toLowerCase();
+  const cleanWord = word.trim().replace(/\s+/g, " ").toLowerCase();
   if (cleanWord.split(" ").length > 12) {
     throw new ApiError(400, "Phrase cannot contain more than 12 words");
  }
   const existingWord = await Word.findOne({ word: cleanWord });
   if (existingWord) {
-    throw new ApiError(409, "Word already exists in the database");
+    throw new ApiError(409, `Word "${cleanWord}" already exists in the dictionary`);
   }
 
   if (!Object.hasOwn(sourceNames, normalizedSource)) {
@@ -131,51 +214,10 @@ const createWord = asyncHandler(async (req, res) => {
     if (normalizedSource === "free-dictionary") {
       generatedData = await getFreeDictionaryWordDetails(cleanWord);
     } else {
-      if (!process.env.GEMINI_API_KEY) {
-        throw new ApiError(500, "GEMINI_API_KEY is not configured in backend environment variables");
-      }
-
-      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-3.1-flash-lite",
-        generationConfig: { responseMimeType: "application/json" }
-      });
-
-      const prompt = `Generate a vocabulary dictionary entry for the English word "${cleanWord}". 
-Return a JSON object matching this exact structure:
-{
-  "phonetic": "Phonetic transcription of the word in IPA format",
-  "definitions": [
-    {
-      "partOfSpeech": "noun" (or "adverb", "adjective", "verb", etc.),
-      "definition": "Clear Google-style definition"
-    }
-  ],
-  "synonyms": ["up to 5 synonyms"],
-  "antonyms": ["up to 5 antonyms"],
-  "examples": ["exactly 3 sentence examples showing usage of the word"]
-}
-only allow dictionary entries for real English words and a valid phrase or idioms, if user types random prompts or gibberish, aur ask questions or anything which is not a valid word or idiom, like "What is the meaning of life?" or "How to make a cake? or tell me your name ", check it accurately and only passed the valid words or idioms to the dictionary entry generator, if the input is invalid,
-return a JSON object with the following structure:
-{"error": "Invalid input or unable to generate dictionary entry"}
-Provide definitions for different parts of speech if applicable (e.g. noun, adjective, adverb). Ensure all list fields are array of strings. Do not include any markdown styling like \`\`\`json. Return only the JSON object.`;
-
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-    
-      try {
-        generatedData = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error("Gemini raw response:", responseText);
-        console.error("Parse error details:", parseError);
-        throw new ApiError(500, "Failed to parse dictionary response from Gemini");
-      }
-      if (generatedData.error) {
-        throw new ApiError(400, `Gemini error: ${generatedData.error}`);
-      }
+      generatedData = await getGeminiWordDetails(cleanWord);
     }
 
-    if (!generatedData.definitions || !Array.isArray(generatedData.definitions)) {
+    if (!hasUsableDefinitions(generatedData)) {
       throw new ApiError(500, `Invalid definitions format returned from ${sourceNames[normalizedSource]}`);
     }
 
@@ -192,6 +234,9 @@ Provide definitions for different parts of speech if applicable (e.g. noun, adje
     res.status(201).json(new ApiResponse(201, formatWordForViewer(newWord, userId), "Word created successfully"));
   } catch (error) {
     if (error instanceof ApiError) throw error;
+    if (error?.code === 11000) {
+      throw new ApiError(409, `Word "${cleanWord}" already exists in the dictionary`);
+    }
     throw new ApiError(500, `Error generating word details via ${sourceNames[normalizedSource]}: ${error.message}`);
   }
 });
