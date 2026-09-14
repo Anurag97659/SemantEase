@@ -7,6 +7,7 @@ import personalNoteRoutes from './routes/personalNote.routes.js';
 import suggestionRoutes from './routes/suggestion.routes.js';
 import oauthRoutes from './routes/oauth.routes.js';
 import socialRoutes from './routes/social.routes.js';
+import playlistRoutes from './routes/playlist.routes.js';
 
 const app = express();
 
@@ -43,6 +44,7 @@ app.use('/WoahCab/notes', personalNoteRoutes);
 app.use('/WoahCab/suggestions', suggestionRoutes);
 app.use('/WoahCab/oauth', oauthRoutes);
 app.use('/WoahCab/social', socialRoutes);
+app.use('/WoahCab/playlists', playlistRoutes);
 
 
 app.use((err, req, res, next) => {

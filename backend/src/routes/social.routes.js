@@ -3,6 +3,9 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 import {
   getSocialOverview,
   searchUsers,
+  getFriendProfile,
+  getFriendPlaylists,
+  getFriendPlaylistById,
   sendFriendRequest,
   acceptFriendRequest,
   rejectFriendRequest,
@@ -18,6 +21,9 @@ const router = Router();
 
 router.route("/overview").get(verifyJWT, getSocialOverview);
 router.route("/search-users").get(verifyJWT, searchUsers);
+router.route("/friend/:friendId/profile").get(verifyJWT, getFriendProfile);
+router.route("/friend/:friendId/playlists").get(verifyJWT, getFriendPlaylists);
+router.route("/friend/:friendId/playlists/:playlistId").get(verifyJWT, getFriendPlaylistById);
 router.route("/friend-request").post(verifyJWT, sendFriendRequest);
 router.route("/friend-request/:requesterId/accept").post(verifyJWT, acceptFriendRequest);
 router.route("/friend-request/:requesterId/reject").post(verifyJWT, rejectFriendRequest);

@@ -156,6 +156,17 @@ export default function Navbar() {
                   </Link>
 
                   <Link
+                    href="/playlists"
+                    onClick={() => setIsAccountMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-all"
+                  >
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6.5A2.5 2.5 0 016.5 4h3.879a2 2 0 011.414.586l1.621 1.621a2 2 0 001.414.586H17.5A2.5 2.5 0 0120 9.293v8.207A2.5 2.5 0 0117.5 20h-11A2.5 2.5 0 014 17.5v-11z" />
+                    </svg>
+                    Playlists
+                  </Link>
+
+                  <Link
                     href="/friends"
                     onClick={() => setIsAccountMenuOpen(false)}
                     className="flex items-center gap-2.5 px-3.5 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 hover:bg-slate-100 dark:hover:bg-slate-800/60 rounded-xl transition-all"

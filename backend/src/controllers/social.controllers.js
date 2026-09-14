@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { User } from "../models/user.model.js";
 import { Word } from "../models/word.model.js";
 import { Blend } from "../models/blend.model.js";
+import { Playlist } from "../models/playlist.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -12,9 +13,9 @@ const formatWordForViewer = (word, userId) => {
   const { notes = [], starredBy = [], ...safeWord } = wordObject;
   const isStarred = Boolean(
     userId &&
-      starredBy.some(
-        (starredUserId) => starredUserId.toString() === userId.toString()
-      )
+    starredBy.some(
+      (starredUserId) => starredUserId.toString() === userId.toString()
+    )
   );
 
   if (!userId) {
@@ -34,9 +35,9 @@ const formatBlendWordForViewer = (word, userId) => {
   const { notes = [], starredBy = [], ...safeWord } = wordObject;
   const isStarred = Boolean(
     userId &&
-      starredBy.some(
-        (starredUserId) => starredUserId.toString() === userId.toString()
-      )
+    starredBy.some(
+      (starredUserId) => starredUserId.toString() === userId.toString()
+    )
   );
   const ownerNote = notes.find(
     (note) => note.user?.toString() === wordObject.createdBy?._id?.toString()
@@ -52,6 +53,26 @@ const toUserCard = (user) => ({
   username: user.username,
   fullname: user.fullname,
 });
+
+const getFriendForViewer = async (viewerId, friendId) => {
+  if (!mongoose.Types.ObjectId.isValid(friendId)) {
+    throw new ApiError(404, "Friend not found");
+  }
+
+  const viewer = await User.findById(viewerId).select("friends");
+  if (!viewer) throw new ApiError(404, "User not found");
+
+  const isFriend = (viewer.friends || []).some(
+    (savedFriendId) => savedFriendId.toString() === friendId
+  );
+  if (!isFriend) {
+    throw new ApiError(403, "This profile is only visible to friends");
+  }
+
+  const friend = await User.findById(friendId).select("username fullname");
+  if (!friend) throw new ApiError(404, "Friend not found");
+  return friend;
+};
 
 const getSocialOverview = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id)
@@ -115,7 +136,9 @@ const searchUsers = asyncHandler(async (req, res) => {
     .select("username fullname")
     .limit(20);
 
-  const friendIds = new Set((currentUser.friends || []).map((id) => id.toString()));
+  const friendIds = new Set(
+    (currentUser.friends || []).map((id) => id.toString())
+  );
   const incomingIds = new Set(
     (currentUser.incomingFriendRequests || []).map((id) => id.toString())
   );
@@ -141,6 +164,89 @@ const searchUsers = asyncHandler(async (req, res) => {
   return res
     .status(200)
     .json(new ApiResponse(200, result, "Users fetched successfully"));
+});
+
+const getFriendProfile = asyncHandler(async (req, res) => {
+  const friend = await getFriendForViewer(req.user._id, req.params.friendId);
+
+  const [addedWords, favoriteWords] = await Promise.all([
+    Word.find({ createdBy: friend._id })
+      .populate("createdBy", "username fullname")
+      .sort({ createdAt: -1 }),
+    Word.find({ starredBy: friend._id })
+      .populate("createdBy", "username fullname")
+      .sort({ createdAt: -1 }),
+  ]);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        friend: toUserCard(friend),
+        addedWords: addedWords.map((word) =>
+          formatWordForViewer(word, req.user._id)
+        ),
+        favoriteWords: favoriteWords.map((word) =>
+          formatWordForViewer(word, req.user._id)
+        ),
+      },
+      "Friend profile fetched successfully"
+    )
+  );
+});
+
+const getFriendPlaylists = asyncHandler(async (req, res) => {
+  const friend = await getFriendForViewer(req.user._id, req.params.friendId);
+  const playlists = await Playlist.find({ owner: friend._id })
+    .select("name words createdAt updatedAt")
+    .sort({ updatedAt: -1 });
+
+  const summaries = playlists.map((playlist) => ({
+    _id: playlist._id,
+    name: playlist.name,
+    wordCount: playlist.words.length,
+    createdAt: playlist.createdAt,
+    updatedAt: playlist.updatedAt,
+  }));
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { friend: toUserCard(friend), playlists: summaries },
+        "Friend playlists fetched successfully"
+      )
+    );
+});
+
+const getFriendPlaylistById = asyncHandler(async (req, res) => {
+  const friend = await getFriendForViewer(req.user._id, req.params.friendId);
+  const { playlistId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(playlistId)) {
+    throw new ApiError(404, "Playlist not found");
+  }
+
+  const playlist = await Playlist.findOne({
+    _id: playlistId,
+    owner: friend._id,
+  }).populate({
+    path: "words",
+    select:
+      "word phonetic definitions synonyms antonyms examples createdAt updatedAt createdBy",
+    populate: { path: "createdBy", select: "username fullname" },
+  });
+  if (!playlist) throw new ApiError(404, "Playlist not found");
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { ...playlist.toObject(), friend: toUserCard(friend) },
+        "Friend playlist fetched successfully"
+      )
+    );
 });
 
 const sendFriendRequest = asyncHandler(async (req, res) => {
@@ -198,7 +304,13 @@ const sendFriendRequest = asyncHandler(async (req, res) => {
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { requesterId: currentId, targetId }, "Friend request sent"));
+    .json(
+      new ApiResponse(
+        200,
+        { requesterId: currentId, targetId },
+        "Friend request sent"
+      )
+    );
 });
 
 const acceptFriendRequest = asyncHandler(async (req, res) => {
@@ -226,17 +338,21 @@ const acceptFriendRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, "No incoming request from this user");
   }
 
-  currentUser.incomingFriendRequests = (currentUser.incomingFriendRequests || []).filter(
-    (id) => id.toString() !== requesterUserId
-  );
-  requester.outgoingFriendRequests = (requester.outgoingFriendRequests || []).filter(
-    (id) => id.toString() !== currentUserId
-  );
+  currentUser.incomingFriendRequests = (
+    currentUser.incomingFriendRequests || []
+  ).filter((id) => id.toString() !== requesterUserId);
+  requester.outgoingFriendRequests = (
+    requester.outgoingFriendRequests || []
+  ).filter((id) => id.toString() !== currentUserId);
 
-  if (!(currentUser.friends || []).some((id) => id.toString() === requesterUserId)) {
+  if (
+    !(currentUser.friends || []).some((id) => id.toString() === requesterUserId)
+  ) {
     currentUser.friends.push(requester._id);
   }
-  if (!(requester.friends || []).some((id) => id.toString() === currentUserId)) {
+  if (
+    !(requester.friends || []).some((id) => id.toString() === currentUserId)
+  ) {
     requester.friends.push(currentUser._id);
   }
 
@@ -272,12 +388,12 @@ const rejectFriendRequest = asyncHandler(async (req, res) => {
     throw new ApiError(404, "No incoming request from this user");
   }
 
-  currentUser.incomingFriendRequests = (currentUser.incomingFriendRequests || []).filter(
-    (id) => id.toString() !== requesterUserId
-  );
-  requester.outgoingFriendRequests = (requester.outgoingFriendRequests || []).filter(
-    (id) => id.toString() !== currentUserId
-  );
+  currentUser.incomingFriendRequests = (
+    currentUser.incomingFriendRequests || []
+  ).filter((id) => id.toString() !== requesterUserId);
+  requester.outgoingFriendRequests = (
+    requester.outgoingFriendRequests || []
+  ).filter((id) => id.toString() !== currentUserId);
 
   await Promise.all([currentUser.save(), requester.save()]);
 
@@ -297,8 +413,12 @@ const createBlend = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
-  const friendIdSet = new Set((currentUser.friends || []).map((id) => id.toString()));
-  const normalizedIds = Array.from(new Set(memberIds.map((id) => String(id).trim())));
+  const friendIdSet = new Set(
+    (currentUser.friends || []).map((id) => id.toString())
+  );
+  const normalizedIds = Array.from(
+    new Set(memberIds.map((id) => String(id).trim()))
+  );
 
   if (
     normalizedIds.some(
@@ -318,7 +438,10 @@ const createBlend = asyncHandler(async (req, res) => {
   const sortedSignature = [...allMemberIds].sort().join(":");
   const existingBlends = await Blend.find({ members: { $all: allMemberIds } });
   const exactBlend = existingBlends.find((blend) => {
-    const signature = (blend.members || []).map((id) => id.toString()).sort().join(":");
+    const signature = (blend.members || [])
+      .map((id) => id.toString())
+      .sort()
+      .join(":");
     return signature === sortedSignature;
   });
 
@@ -351,7 +474,10 @@ const getBlendById = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Invalid blend ID");
   }
 
-  const blend = await Blend.findById(blendId).populate("members", "username fullname");
+  const blend = await Blend.findById(blendId).populate(
+    "members",
+    "username fullname"
+  );
   if (!blend) {
     throw new ApiError(404, "Blend not found");
   }
@@ -369,7 +495,9 @@ const getBlendById = asyncHandler(async (req, res) => {
       {
         _id: blend._id,
         members: (blend.members || []).map((member) => toUserCard(member)),
-        title: (blend.members || []).map((member) => member.username).join(" + "),
+        title: (blend.members || [])
+          .map((member) => member.username)
+          .join(" + "),
         createdAt: blend.createdAt,
       },
       "Blend details fetched successfully"
@@ -413,7 +541,9 @@ const getBlendWords = asyncHandler(async (req, res) => {
   }
 
   const viewerId = req.user._id.toString();
-  const isMember = (blend.members || []).some((memberId) => memberId.toString() === viewerId);
+  const isMember = (blend.members || []).some(
+    (memberId) => memberId.toString() === viewerId
+  );
   if (!isMember) {
     throw new ApiError(403, "You are not a member of this blend");
   }
@@ -427,7 +557,9 @@ const getBlendWords = asyncHandler(async (req, res) => {
   );
   return res
     .status(200)
-    .json(new ApiResponse(200, wordsForViewer, "Blend words fetched successfully"));
+    .json(
+      new ApiResponse(200, wordsForViewer, "Blend words fetched successfully")
+    );
 });
 
 const searchBlendWords = asyncHandler(async (req, res) => {
@@ -447,7 +579,9 @@ const searchBlendWords = asyncHandler(async (req, res) => {
   }
 
   const viewerId = req.user._id.toString();
-  const isMember = (blend.members || []).some((memberId) => memberId.toString() === viewerId);
+  const isMember = (blend.members || []).some(
+    (memberId) => memberId.toString() === viewerId
+  );
   if (!isMember) {
     throw new ApiError(403, "You are not a member of this blend");
   }
@@ -458,7 +592,9 @@ const searchBlendWords = asyncHandler(async (req, res) => {
   );
 
   if (words.length === 0) {
-    return res.status(200).json(new ApiResponse(200, [], "No words in this blend"));
+    return res
+      .status(200)
+      .json(new ApiResponse(200, [], "No words in this blend"));
   }
 
   const compactWords = words.map((word) => ({
@@ -511,7 +647,9 @@ Return only a JSON array of IDs like ["id1","id2"].`;
 
     return res
       .status(200)
-      .json(new ApiResponse(200, wordsForViewer, "Blend semantic search completed"));
+      .json(
+        new ApiResponse(200, wordsForViewer, "Blend semantic search completed")
+      );
   } catch (_error) {
     const query = queryText.toLowerCase();
     const fallback = words.filter((item) => {
@@ -529,7 +667,9 @@ Return only a JSON array of IDs like ["id1","id2"].`;
     );
     return res
       .status(200)
-      .json(new ApiResponse(200, wordsForViewer, "Blend search fallback completed"));
+      .json(
+        new ApiResponse(200, wordsForViewer, "Blend search fallback completed")
+      );
   }
 });
 
@@ -568,6 +708,9 @@ const removeFriend = asyncHandler(async (req, res) => {
 export {
   getSocialOverview,
   searchUsers,
+  getFriendProfile,
+  getFriendPlaylists,
+  getFriendPlaylistById,
   sendFriendRequest,
   acceptFriendRequest,
   rejectFriendRequest,

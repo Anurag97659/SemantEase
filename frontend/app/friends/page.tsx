@@ -32,7 +32,9 @@ export default function FriendsPage() {
   const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingRequestId, setSavingRequestId] = useState<string | null>(null);
-  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(
+    null,
+  );
   const [error, setError] = useState("");
 
   const [friends, setFriends] = useState<UserCard[]>([]);
@@ -41,7 +43,9 @@ export default function FriendsPage() {
   const [blends, setBlends] = useState<BlendCard[]>([]);
 
   const [showBlendModal, setShowBlendModal] = useState(false);
-  const [selectedBlendFriendIds, setSelectedBlendFriendIds] = useState<string[]>([]);
+  const [selectedBlendFriendIds, setSelectedBlendFriendIds] = useState<
+    string[]
+  >([]);
   const [creatingBlend, setCreatingBlend] = useState(false);
   const [deletingBlendId, setDeletingBlendId] = useState<string | null>(null);
   const [removingFriendId, setRemovingFriendId] = useState<string | null>(null);
@@ -69,7 +73,8 @@ export default function FriendsPage() {
         applyOverview(response?.data || {});
       })
       .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : "Failed to load social data";
+        const message =
+          err instanceof Error ? err.message : "Failed to load social data";
         if (message.includes("Unauthorized") || message.includes("401")) {
           router.push("/login");
           return;
@@ -87,11 +92,12 @@ export default function FriendsPage() {
     const timer = setTimeout(async () => {
       try {
         const response = await apiFetch(
-          `/WoahCab/social/search-users?q=${encodeURIComponent(searchInput.trim())}`
+          `/WoahCab/social/search-users?q=${encodeURIComponent(searchInput.trim())}`,
         );
         setSearchResults(response?.data || []);
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : "Failed to search users";
+        const message =
+          err instanceof Error ? err.message : "Failed to search users";
         setError(message);
       } finally {
         setSearching(false);
@@ -111,35 +117,45 @@ export default function FriendsPage() {
       });
       setSearchResults((current) =>
         current.map((entry) =>
-          entry._id === userId ? { ...entry, status: "requested" } : entry
-        )
+          entry._id === userId ? { ...entry, status: "requested" } : entry,
+        ),
       );
       await loadOverview();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Could not send friend request");
+      setError(
+        err instanceof Error ? err.message : "Could not send friend request",
+      );
     } finally {
       setSavingRequestId(null);
     }
   };
 
-  const updateIncomingRequest = async (requesterId: string, action: "accept" | "reject") => {
+  const updateIncomingRequest = async (
+    requesterId: string,
+    action: "accept" | "reject",
+  ) => {
     setProcessingRequestId(requesterId);
     setError("");
     try {
-      await apiFetch(`/WoahCab/social/friend-request/${requesterId}/${action}`, {
-        method: "POST",
-      });
+      await apiFetch(
+        `/WoahCab/social/friend-request/${requesterId}/${action}`,
+        {
+          method: "POST",
+        },
+      );
       await loadOverview();
       setSearchResults((current) =>
         current.map((entry) =>
           entry._id === requesterId
             ? { ...entry, status: action === "accept" ? "friend" : "none" }
-            : entry
-        )
+            : entry,
+        ),
       );
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : `Could not ${action} friend request`
+        err instanceof Error
+          ? err.message
+          : `Could not ${action} friend request`,
       );
     } finally {
       setProcessingRequestId(null);
@@ -150,7 +166,7 @@ export default function FriendsPage() {
     setSelectedBlendFriendIds((current) =>
       current.includes(friendId)
         ? current.filter((id) => id !== friendId)
-        : [...current, friendId]
+        : [...current, friendId],
     );
   };
 
@@ -175,7 +191,11 @@ export default function FriendsPage() {
   };
 
   const deleteBlend = async (blendId: string) => {
-    if (!window.confirm("Are you sure you want to delete this blend for all members?")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this blend for all members?",
+      )
+    ) {
       return;
     }
     setDeletingBlendId(blendId);
@@ -197,7 +217,9 @@ export default function FriendsPage() {
     setRemovingFriendId(friendId);
     setError("");
     try {
-      await apiFetch(`/WoahCab/social/friend/${friendId}`, { method: "DELETE" });
+      await apiFetch(`/WoahCab/social/friend/${friendId}`, {
+        method: "DELETE",
+      });
       await loadOverview();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not remove friend");
@@ -208,7 +230,7 @@ export default function FriendsPage() {
 
   const requestedIds = useMemo(
     () => new Set(outgoingRequests.map((user) => user._id)),
-    [outgoingRequests]
+    [outgoingRequests],
   );
 
   if (loading) {
@@ -228,10 +250,12 @@ export default function FriendsPage() {
 
       <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8">
         <section className="rounded-[2rem] border border-violet-500/15 bg-gradient-to-br from-violet-600/12 via-indigo-500/8 to-transparent p-7 md:p-10 mb-8">
-          <h1 className="text-3xl md:text-4xl font-black tracking-tight">Friends</h1>
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight">
+            Friends
+          </h1>
           <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-400 max-w-2xl">
-            Find friends, manage requests, and build collaborative blends for shared
-            vocabulary practice.
+            Find friends, manage requests, and build collaborative blends for
+            shared vocabulary practice.
           </p>
         </section>
 
@@ -281,13 +305,20 @@ export default function FriendsPage() {
                   >
                     <div>
                       <p className="font-semibold">@{result.username}</p>
-                      <p className="text-xs text-slate-500">{result.fullname}</p>
+                      <p className="text-xs text-slate-500">
+                        {result.fullname}
+                      </p>
                     </div>
                     <div>
                       {result.status === "friend" ? (
-                        <span className="text-xs font-bold text-emerald-600">Friends</span>
-                      ) : result.status === "requested" || requestedIds.has(result._id) ? (
-                        <span className="text-xs font-bold text-violet-600">Requested</span>
+                        <span className="text-xs font-bold text-emerald-600">
+                          Friends
+                        </span>
+                      ) : result.status === "requested" ||
+                        requestedIds.has(result._id) ? (
+                        <span className="text-xs font-bold text-violet-600">
+                          Requested
+                        </span>
                       ) : result.status === "incoming_request" ? (
                         <span className="text-xs font-bold text-amber-600">
                           Requested you (check Requests tab)
@@ -299,7 +330,9 @@ export default function FriendsPage() {
                           disabled={savingRequestId === result._id}
                           className="rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-bold px-3 py-2 disabled:opacity-60 cursor-pointer"
                         >
-                          {savingRequestId === result._id ? "Sending…" : "Send Request"}
+                          {savingRequestId === result._id
+                            ? "Sending…"
+                            : "Send Request"}
                         </button>
                       )}
                     </div>
@@ -363,10 +396,15 @@ export default function FriendsPage() {
                     key={friend._id}
                     className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3"
                   >
-                    <div>
+                    <Link
+                      href={`/friends/profile?id=${friend._id}`}
+                      className="min-w-0 flex-1 rounded-lg -m-1 p-1 hover:bg-card-hover transition-colors"
+                    >
                       <p className="font-semibold">@{friend.username}</p>
-                      <p className="text-xs text-slate-500">{friend.fullname}</p>
-                    </div>
+                      <p className="text-xs text-slate-500">
+                        {friend.fullname}
+                      </p>
+                    </Link>
                     <button
                       type="button"
                       onClick={() => removeFriend(friend._id)}
@@ -376,7 +414,9 @@ export default function FriendsPage() {
                       className="rounded-lg p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       {removingFriendId === friend._id ? (
-                        <span className="text-xs font-bold text-slate-400">…</span>
+                        <span className="text-xs font-bold text-slate-400">
+                          …
+                        </span>
                       ) : (
                         <svg
                           className="w-4 h-4"
@@ -413,12 +453,16 @@ export default function FriendsPage() {
                   >
                     <div>
                       <p className="font-semibold">@{requester.username}</p>
-                      <p className="text-xs text-slate-500">{requester.fullname}</p>
+                      <p className="text-xs text-slate-500">
+                        {requester.fullname}
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => updateIncomingRequest(requester._id, "accept")}
+                        onClick={() =>
+                          updateIncomingRequest(requester._id, "accept")
+                        }
                         disabled={processingRequestId === requester._id}
                         className="rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-2 disabled:opacity-60 cursor-pointer"
                       >
@@ -426,7 +470,9 @@ export default function FriendsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => updateIncomingRequest(requester._id, "reject")}
+                        onClick={() =>
+                          updateIncomingRequest(requester._id, "reject")
+                        }
                         disabled={processingRequestId === requester._id}
                         className="rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold px-3 py-2 cursor-pointer"
                       >
@@ -464,7 +510,10 @@ export default function FriendsPage() {
                     className="rounded-xl border border-border bg-background hover:border-violet-500/30 px-4 py-3"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <Link href={`/friends/blends?id=${blend._id}`} className="flex-1">
+                      <Link
+                        href={`/friends/blends?id=${blend._id}`}
+                        className="flex-1"
+                      >
                         <p className="font-semibold">{blend.title}</p>
                         <p className="text-xs text-slate-500 mt-1">
                           {blend.members.length} members
@@ -523,7 +572,9 @@ export default function FriendsPage() {
                   >
                     <div>
                       <p className="font-semibold">@{friend.username}</p>
-                      <p className="text-xs text-slate-500">{friend.fullname}</p>
+                      <p className="text-xs text-slate-500">
+                        {friend.fullname}
+                      </p>
                     </div>
                     <input
                       type="checkbox"
