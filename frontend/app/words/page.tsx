@@ -48,6 +48,8 @@ export default function WordListPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [visibleSearchResults, setVisibleSearchResults] = useState(WORDS_PER_PAGE);
+  const [searchMode, setSearchMode] = useState<"normal" | "semantic">("normal");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   
   useEffect(() => {
@@ -126,13 +128,14 @@ export default function WordListPage() {
       });
   }, []);
 
-  // Fetch the first 50 records for normal browsing. Search retains its semantic
-  // endpoint, but only renders 50 results at a time below.
+  // Normal searches and browsing are paginated by the API. Semantic search is
+  // kept separate because it ranks results using the semantic-search endpoint.
   useEffect(() => {
     let cancelled = false;
 
-    if (!search.trim()) {
-      setSearchLoading(false);
+    if (!search.trim() || searchMode === "normal") {
+      const normalSearch = search.trim();
+      setSearchLoading(Boolean(normalSearch));
       setLoading(true);
       setVisibleSearchResults(WORDS_PER_PAGE);
       const params = new URLSearchParams({
@@ -144,8 +147,11 @@ export default function WordListPage() {
       if (sortOrder === "username" && usernameFilter.trim()) {
         params.set("username", usernameFilter.trim());
       }
+      if (normalSearch) {
+        params.set("query", normalSearch);
+      }
 
-      apiFetch(`/WoahCab/words/getwords?${params.toString()}`)
+      const loadWords = () => apiFetch(`/WoahCab/words/getwords?${params.toString()}`)
         .then((res) => {
           if (!cancelled && res?.data) {
             setWords(res.data.words || []);
@@ -161,10 +167,18 @@ export default function WordListPage() {
           }
         })
         .finally(() => {
-          if (!cancelled) setLoading(false);
+          if (!cancelled) {
+            setLoading(false);
+            setSearchLoading(false);
+          }
         });
+
+      const delay = normalSearch ? window.setTimeout(loadWords, 300) : undefined;
+      if (!delay) loadWords();
+
       return () => {
         cancelled = true;
+        if (delay) window.clearTimeout(delay);
       };
     }
 
@@ -189,12 +203,12 @@ export default function WordListPage() {
       cancelled = true;
       clearTimeout(delayDebounce);
     };
-  }, [search, filterType, sortOrder, usernameFilter, router]);
+  }, [search, searchMode, filterType, sortOrder, usernameFilter, router]);
 
   const loadMoreWords = async () => {
     if (loadingMore) return;
 
-    if (search.trim()) {
+    if (search.trim() && searchMode === "semantic") {
       setVisibleSearchResults((current) => current + WORDS_PER_PAGE);
       return;
     }
@@ -211,6 +225,9 @@ export default function WordListPage() {
       });
       if (sortOrder === "username" && usernameFilter.trim()) {
         params.set("username", usernameFilter.trim());
+      }
+      if (search.trim()) {
+        params.set("query", search.trim());
       }
 
       const res = await apiFetch(`/WoahCab/words/getwords?${params.toString()}`);
@@ -273,11 +290,11 @@ export default function WordListPage() {
       return sortOrder === "newest" ? -timeDifference : timeDifference;
     });
 
-  const isSearching = Boolean(search.trim());
-  const displayedWords = isSearching
+  const isSemanticSearch = Boolean(search.trim()) && searchMode === "semantic";
+  const displayedWords = isSemanticSearch
     ? filteredWords.slice(0, visibleSearchResults)
     : filteredWords;
-  const canLoadMore = isSearching
+  const canLoadMore = isSemanticSearch
     ? filteredWords.length > visibleSearchResults
     : hasMore;
 
@@ -400,24 +417,102 @@ const formatUploadDate = (date?: string) => {
               )}
             </div>
 
-            {/* Search Input (with loading indicator) */}
-            <div className="relative flex-1 sm:w-80">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+            <div className="relative flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                aria-label="Open word search"
+                aria-expanded={isSearchOpen}
+                className={`flex h-11 w-11 items-center justify-center rounded-2xl border transition-all ${
+                  isSearchOpen || search
+                    ? "border-violet-500 bg-violet-600 text-white shadow-sm"
+                    : "border-border bg-card text-slate-600 hover:border-violet-500/50 hover:text-violet-600 dark:text-slate-300"
+                }`}
+              >
                 {searchLoading ? (
-                  <div className="w-4 h-4 rounded-full border-2 border-t-violet-500 border-indigo-500/10 animate-spin" />
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" />
                   </svg>
                 )}
-              </span>
-              <input
-                type="text"
-                placeholder="Ask Google-like semantic query (e.g. lasts very short time)..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-card border border-border rounded-2xl text-slate-900 dark:text-slate-100 placeholder-slate-450 dark:placeholder-slate-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 transition-all text-sm font-semibold"
-              />
+              </button>
+
+              <details className="relative">
+                <summary className="flex h-11 cursor-pointer list-none items-center gap-2 rounded-2xl border border-border bg-card px-3 text-xs font-bold text-slate-700 transition-colors hover:border-violet-500/50 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                  <span className="hidden sm:inline">{searchMode === "normal" ? "Normal search" : "Semantic search"}</span>
+                  <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m6 9 6 6 6-6" />
+                  </svg>
+                </summary>
+                <div className="absolute right-0 top-full z-30 mt-2 w-80 rounded-2xl border border-border bg-card p-2 shadow-xl">
+                  <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Search type</p>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      setSearchMode("normal");
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                    }}
+                    className={`w-full rounded-xl px-3 py-2.5 text-left transition-colors ${
+                      searchMode === "normal" ? "bg-violet-600/10 text-violet-700 dark:text-violet-300" : "hover:bg-background"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold">Normal search</span>
+                    <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">Matches the words and text you type.</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      setSearchMode("semantic");
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                    }}
+                    className={`mt-1 w-full rounded-xl px-3 py-2.5 text-left transition-colors ${
+                      searchMode === "semantic" ? "bg-violet-600/10 text-violet-700 dark:text-violet-300" : "hover:bg-background"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold">Semantic search</span>
+                    <span className="mt-0.5 block text-xs font-medium text-slate-500 dark:text-slate-400">Finds words related to a meaning or description.</span>
+                  </button>
+                </div>
+              </details>
+
+              {isSearchOpen && (
+                <div className="absolute right-0 top-full z-20 mt-2 w-80 max-w-[calc(100vw-3rem)] rounded-2xl border border-border bg-card p-2 shadow-xl">
+                  <label htmlFor="word-search" className="sr-only">
+                    {searchMode === "normal" ? "Search words" : "Search words by meaning"}
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500">
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" />
+                      </svg>
+                    </span>
+                    <input
+                      id="word-search"
+                      type="search"
+                      autoFocus
+                      maxLength={100}
+                      placeholder={searchMode === "normal" ? "Search words or definitions..." : "Describe a meaning, e.g. lasts very briefly..."}
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      className="w-full rounded-xl bg-background py-3 pl-10 pr-10 text-sm font-semibold text-slate-900 placeholder-slate-450 outline-none ring-1 ring-border transition focus:ring-violet-500/60 dark:text-slate-100 dark:placeholder-slate-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearch("");
+                        setIsSearchOpen(false);
+                      }}
+                      aria-label="Close and clear search"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition-colors hover:text-slate-700 dark:hover:text-slate-200"
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="m6 18 12-12M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

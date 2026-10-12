@@ -244,8 +244,6 @@ const createWord = asyncHandler(async (req, res) => {
 const getWords = asyncHandler(async (req, res) => {
   const isPaginatedRequest = "page" in req.query || "limit" in req.query;
 
-  // Keep the original array response for existing consumers that have not opted
-  // into pagination yet (for example, the playlist picker).
   if (!isPaginatedRequest) {
     const words = await Word.find().populate("createdBy", "username fullname");
     const wordsForViewer = words.map((word) => formatWordForViewer(word, req.user?._id));
@@ -261,6 +259,7 @@ const getWords = asyncHandler(async (req, res) => {
     : 50;
   const filter = req.query.filter;
   const username = typeof req.query.username === "string" ? req.query.username.trim() : "";
+  const normalSearch = typeof req.query.query === "string" ? req.query.query.trim().slice(0, 100) : "";
   const wordQuery = {};
 
   if (filter === "mine") {
@@ -296,6 +295,17 @@ const getWords = asyncHandler(async (req, res) => {
       username: { $regex: username, $options: "i" },
     }).select("_id");
     wordQuery.createdBy = { $in: matchingUsers.map((user) => user._id) };
+  }
+
+  if (normalSearch) {
+    const escapedSearch = normalSearch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const searchPattern = new RegExp(escapedSearch, "i");
+    wordQuery.$or = [
+      { word: searchPattern },
+      { "definitions.definition": searchPattern },
+      { synonyms: searchPattern },
+      { antonyms: searchPattern },
+    ];
   }
 
   const sort = req.query.sort === "oldest" ? { createdAt: 1 } : { createdAt: -1 };
