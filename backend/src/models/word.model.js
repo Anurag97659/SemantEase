@@ -67,4 +67,8 @@ const wordSchema = new Schema(
   { timestamps: true }
 );
 
+wordSchema.index({ createdAt: -1 });
+wordSchema.index({ createdBy: 1, createdAt: -1 });
+wordSchema.index({ starredBy: 1, createdAt: -1 });
+
 export const Word = mongoose.model("Word", wordSchema);

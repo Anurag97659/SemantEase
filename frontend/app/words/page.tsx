@@ -7,6 +7,8 @@ import Navbar from "../../components/Navbar";
 import { apiFetch } from "../../utils/api";
 import PronunciationEngine from "../../components/PronunciationEngine";
 
+const WORDS_PER_PAGE = 50;
+
 interface Definition {
   partOfSpeech: string;
   definition: string;
@@ -42,6 +44,10 @@ export default function WordListPage() {
   const [starringWordId, setStarringWordId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [hasRestoredScroll, setHasRestoredScroll] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [visibleSearchResults, setVisibleSearchResults] = useState(WORDS_PER_PAGE);
 
   
   useEffect(() => {
@@ -120,42 +126,105 @@ export default function WordListPage() {
       });
   }, []);
 
-  // 2. Debounced API Semantic Search
+  // Fetch the first 50 records for normal browsing. Search retains its semantic
+  // endpoint, but only renders 50 results at a time below.
   useEffect(() => {
-    // If query is empty, fetch all words
+    let cancelled = false;
+
     if (!search.trim()) {
       setSearchLoading(false);
-      apiFetch("/WoahCab/words/getwords")
+      setLoading(true);
+      setVisibleSearchResults(WORDS_PER_PAGE);
+      const params = new URLSearchParams({
+        page: "1",
+        limit: WORDS_PER_PAGE.toString(),
+        filter: filterType,
+        sort: sortOrder,
+      });
+      if (sortOrder === "username" && usernameFilter.trim()) {
+        params.set("username", usernameFilter.trim());
+      }
+
+      apiFetch(`/WoahCab/words/getwords?${params.toString()}`)
         .then((res) => {
-          if (res?.data) {
-            setWords(res.data);
+          if (!cancelled && res?.data) {
+            setWords(res.data.words || []);
+            setPage(res.data.page || 1);
+            setHasMore(Boolean(res.data.hasMore));
           }
         })
         .catch((err) => {
+          if (cancelled) return;
           setError(err.message || "Failed to load vocabulary");
           if (err.message?.includes("Unauthorized") || err.message?.includes("401")) {
             router.push("/login");
           }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
         });
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
 
     setSearchLoading(true);
+    setHasMore(false);
+    setPage(1);
+    setVisibleSearchResults(WORDS_PER_PAGE);
     const delayDebounce = setTimeout(async () => {
       try {
         const res = await apiFetch(`/WoahCab/words/search?q=${encodeURIComponent(search.trim())}`);
-        if (res?.data) {
+        if (!cancelled && res?.data) {
           setWords(res.data);
         }
-      } catch (err: any) {
-        console.error("Semantic search failed:", err);
+      } catch (err: unknown) {
+        if (!cancelled) console.error("Semantic search failed:", err);
       } finally {
-        setSearchLoading(false);
+        if (!cancelled) setSearchLoading(false);
       }
     }, 600); // 600ms debounce to give natural typing space
 
-    return () => clearTimeout(delayDebounce);
-  }, [search, router]);
+    return () => {
+      cancelled = true;
+      clearTimeout(delayDebounce);
+    };
+  }, [search, filterType, sortOrder, usernameFilter, router]);
+
+  const loadMoreWords = async () => {
+    if (loadingMore) return;
+
+    if (search.trim()) {
+      setVisibleSearchResults((current) => current + WORDS_PER_PAGE);
+      return;
+    }
+
+    setLoadingMore(true);
+    setError("");
+
+    try {
+      const params = new URLSearchParams({
+        page: (page + 1).toString(),
+        limit: WORDS_PER_PAGE.toString(),
+        filter: filterType,
+        sort: sortOrder,
+      });
+      if (sortOrder === "username" && usernameFilter.trim()) {
+        params.set("username", usernameFilter.trim());
+      }
+
+      const res = await apiFetch(`/WoahCab/words/getwords?${params.toString()}`);
+      if (res?.data) {
+        setWords((currentWords) => [...currentWords, ...(res.data.words || [])]);
+        setPage(res.data.page || page + 1);
+        setHasMore(Boolean(res.data.hasMore));
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load more words");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleToggleStar = async (wordId: string) => {
     if (!currentUser) {
@@ -203,6 +272,14 @@ export default function WordListPage() {
       const timeDifference = new Date(firstWord.createdAt || 0).getTime() - new Date(secondWord.createdAt || 0).getTime();
       return sortOrder === "newest" ? -timeDifference : timeDifference;
     });
+
+  const isSearching = Boolean(search.trim());
+  const displayedWords = isSearching
+    ? filteredWords.slice(0, visibleSearchResults)
+    : filteredWords;
+  const canLoadMore = isSearching
+    ? filteredWords.length > visibleSearchResults
+    : hasMore;
 
 const formatUploadDate = (date?: string) => {
     if (!date) return "";
@@ -364,9 +441,10 @@ const formatUploadDate = (date?: string) => {
               </div>
             ))}
           </div>
-        ) : filteredWords.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredWords.map((item) => {
+        ) : displayedWords.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {displayedWords.map((item) => {
               const isMine = currentUser && item.createdBy && item.createdBy._id === currentUser._id;
               return (
                 <article
@@ -453,6 +531,19 @@ const formatUploadDate = (date?: string) => {
               );
             })}
           </div>
+            {canLoadMore && (
+              <div className="mt-10 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMoreWords}
+                  disabled={loadingMore}
+                  className="rounded-2xl border border-violet-500/30 bg-violet-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-violet-600/10 transition-all hover:bg-violet-500 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {loadingMore ? "Loading…" : "Load 50 more words"}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="backdrop-blur-xl bg-card border border-border rounded-3xl p-16 text-center shadow-xl max-w-lg mx-auto mt-12 animate-fade-in">
             <div className="w-16 h-16 bg-background border border-border text-slate-450 rounded-2xl flex items-center justify-center mx-auto mb-6">

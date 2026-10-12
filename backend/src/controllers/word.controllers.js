@@ -242,9 +242,87 @@ const createWord = asyncHandler(async (req, res) => {
 });
 
 const getWords = asyncHandler(async (req, res) => {
-  const words = await Word.find().populate("createdBy", "username fullname");
+  const isPaginatedRequest = "page" in req.query || "limit" in req.query;
+
+  // Keep the original array response for existing consumers that have not opted
+  // into pagination yet (for example, the playlist picker).
+  if (!isPaginatedRequest) {
+    const words = await Word.find().populate("createdBy", "username fullname");
+    const wordsForViewer = words.map((word) => formatWordForViewer(word, req.user?._id));
+    res.status(200).json(new ApiResponse(200, wordsForViewer, "Words retrieved successfully"));
+    return;
+  }
+
+  const requestedPage = Number.parseInt(req.query.page, 10);
+  const requestedLimit = Number.parseInt(req.query.limit, 10);
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const limit = Number.isInteger(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 50)
+    : 50;
+  const filter = req.query.filter;
+  const username = typeof req.query.username === "string" ? req.query.username.trim() : "";
+  const wordQuery = {};
+
+  if (filter === "mine") {
+    if (!req.user?._id) {
+      res.status(200).json(
+        new ApiResponse(
+          200,
+          { words: [], page, limit, total: 0, hasMore: false },
+          "Words retrieved successfully"
+        )
+      );
+      return;
+    }
+    wordQuery.createdBy = req.user._id;
+  }
+
+  if (filter === "important") {
+    if (!req.user?._id) {
+      res.status(200).json(
+        new ApiResponse(
+          200,
+          { words: [], page, limit, total: 0, hasMore: false },
+          "Words retrieved successfully"
+        )
+      );
+      return;
+    }
+    wordQuery.starredBy = req.user._id;
+  }
+
+  if (username) {
+    const matchingUsers = await User.find({
+      username: { $regex: username, $options: "i" },
+    }).select("_id");
+    wordQuery.createdBy = { $in: matchingUsers.map((user) => user._id) };
+  }
+
+  const sort = req.query.sort === "oldest" ? { createdAt: 1 } : { createdAt: -1 };
+  const [words, total] = await Promise.all([
+    Word.find(wordQuery)
+      .sort(sort)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate("createdBy", "username fullname")
+      .lean(),
+    Word.countDocuments(wordQuery),
+  ]);
   const wordsForViewer = words.map((word) => formatWordForViewer(word, req.user?._id));
-  res.status(200).json(new ApiResponse(200, wordsForViewer, "Words retrieved successfully"));
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        words: wordsForViewer,
+        page,
+        limit,
+        total,
+        hasMore: page * limit < total,
+      },
+      "Words retrieved successfully"
+    )
+  );
 });
 
 const getWordById = asyncHandler(async (req, res) => {
