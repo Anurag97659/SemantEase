@@ -445,7 +445,7 @@ const formatUploadDate = (date?: string) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m6 9 6 6 6-6" />
                   </svg>
                 </summary>
-                <div className="absolute right-0 top-full z-30 mt-2 w-80 rounded-2xl border border-border bg-card p-2 shadow-xl">
+                <div className="absolute left-0 sm:left-auto sm:right-0 top-full z-30 mt-2 w-80 max-w-[calc(100vw-3rem)] rounded-2xl border border-border bg-card p-2 shadow-xl">
                   <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Search type</p>
                   <button
                     type="button"
@@ -477,7 +477,7 @@ const formatUploadDate = (date?: string) => {
               </details>
 
               {isSearchOpen && (
-                <div className="absolute right-0 top-full z-20 mt-2 w-80 max-w-[calc(100vw-3rem)] rounded-2xl border border-border bg-card p-2 shadow-xl">
+                <div className="absolute left-0 sm:left-auto sm:right-0 top-full z-20 mt-2 w-80 max-w-[calc(100vw-3rem)] rounded-2xl border border-border bg-card p-2 shadow-xl">
                   <label htmlFor="word-search" className="sr-only">
                     {searchMode === "normal" ? "Search words" : "Search words by meaning"}
                   </label>
